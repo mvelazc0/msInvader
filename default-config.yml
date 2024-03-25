@@ -1,0 +1,14 @@
+application_id: "your-app-id"
+tenant_id: "your-tenant-id"
+client_secret: "your-client-secret"
+techniques:
+  - technique: "read_email_with_graph"
+    enable: False
+    parameters:
+      user  : "victim@contoso.com"
+      mails : 5
+  - technique: "read_email_with_ews"
+    enabled : True
+    parameters:
+      user  : "victim@contoso.com"
+      mails : 5
