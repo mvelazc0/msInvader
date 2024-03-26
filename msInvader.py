@@ -56,6 +56,51 @@ def read_email_with_graph(params, token):
             body_content = message.get('body', {}).get('content', '')
             #print("Body:", body_content)
 
+def create_rule_with_graph(params, token):
+
+    #https://learn.microsoft.com/en-us/graph/api/resources/messageruleactions?view=graph-rest-1.0
+    user_email = params['user']
+    rule_name = params['rule_name']
+    forward_to = params ['forward_to']
+    body_contains = params ['body_contains']
+
+
+    graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{user_email}/mailFolders/Inbox/messageRules'
+
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+
+    data = {
+        "displayName": rule_name,
+        "sequence": 1,
+        "isEnabled": True,
+        "conditions": {
+            "bodyContains": [
+            body_contains 
+            ]
+        },
+        "actions": {
+            "forwardTo": [
+            {
+                "emailAddress": {
+                    "address": forward_to 
+                }
+            }
+            ],
+            "stopProcessingRules": True
+        }
+    }
+
+    response = requests.post(graph_endpoint, headers=headers, json=data)
+
+    if response.status_code == 201:
+        print ('Created!')
+    else:
+        print(f'Error: {response.status_code}')
+        print (response.text)    
+
 ### EWS
             
  # Function to create SOAP request for FindItem
@@ -90,6 +135,7 @@ def create_find_item_soap_request(mailbox):
 
 # Function to create SOAP request for getting emails
 def create_get_item_soap_request(item_id, mailbox):
+
     return f"""
     <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xmlns:xsd="http://www.w3.org/2001/XMLSchema"
@@ -125,13 +171,12 @@ def read_email_with_ews(params, token):
 
     user_email = params['user']
 
-
     # Headers
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "text/xml; charset=utf-8"
     }
-    print (headers)
+
     # Step 1: FindItem request to get email IDs
     find_item_request = create_find_item_soap_request(user_email)
     find_item_response = requests.post(ews_url, headers=headers, data=find_item_request)
@@ -154,6 +199,93 @@ def read_email_with_ews(params, token):
             subject = message.find('{http://schemas.microsoft.com/exchange/services/2006/types}Subject').text
             body = message.find('{http://schemas.microsoft.com/exchange/services/2006/types}Body').text
             print(f"Subject: {subject}\nBody: {body}\n")
+
+
+def create_forwarding_rule_xml(user, forward_to, rule_name, body_contains):
+    """
+    Generates SOAP XML for creating a forwarding rule in EWS.
+
+    :param forward_to: The email address to forward emails to.
+    :param rule_name: The name of the forwarding rule.
+    :param body_contains: A string that must be contained in the email body to trigger the rule.
+    :return: A string containing the SOAP XML.
+    """
+    return f'''<?xml version="1.0" encoding="utf-8"?>
+    <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
+                xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"
+                xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+        <soap:Header>
+            <t:RequestServerVersion Version="Exchange2016" />
+            <t:ExchangeImpersonation>
+            <t:ConnectingSID>
+                    <t:PrimarySmtpAddress>{user}</t:PrimarySmtpAddress>
+            </t:ConnectingSID>
+            </t:ExchangeImpersonation>
+        </soap:Header>
+        <soap:Body>
+            <m:UpdateInboxRules>
+                <m:Operations>
+                    <t:CreateRuleOperation>
+                        <t:Rule>
+                            <t:DisplayName>{rule_name}</t:DisplayName>
+                            <t:Priority>1</t:Priority>
+                            <t:IsEnabled>true</t:IsEnabled>
+                            <t:Conditions>
+                                <t:ContainsBodyStrings>
+                                    <t:String>{body_contains}</t:String>
+                                </t:ContainsBodyStrings>
+                            </t:Conditions>
+                            <t:Exceptions />
+                            <t:Actions>
+                                <t:ForwardToRecipients>
+                                    <t:Address>
+                                    <t:EmailAddress>{forward_to}</t:EmailAddress>
+                                    </t:Address>
+                                </t:ForwardToRecipients>
+                            </t:Actions>
+                        </t:Rule>
+                    </t:CreateRuleOperation>
+                </m:Operations>
+            </m:UpdateInboxRules>
+        </soap:Body>
+    </soap:Envelope>'''
+
+
+def create_rule_with_ews(params, token):
+
+    print ("Starting create rule with ews")
+    # EWS URL
+    ews_url = "https://outlook.office365.com/EWS/Exchange.asmx"
+
+    user = params['user']
+    forward_to =  params['forward_to']
+    rule_name =  params['rule_name']
+    body_contains =  params['body_contains']
+
+    soap_request = create_forwarding_rule_xml(user, forward_to, rule_name, body_contains)
+
+
+    # Headers
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "text/xml; charset=utf-8"
+    }
+
+    # Send the EWS request with OAuth token
+    response = requests.post(ews_url, data=soap_request, headers={
+        'Content-Type': 'text/xml; charset=utf-8',
+        'Authorization': f'Bearer {token}'
+    })
+
+    # Process the response
+    if response.status_code == 200:
+        print("Rule created successfully.")
+        print(response.text)
+
+    else:
+        print(f"Failed to create rule. Status code: {response.status_code}")
+        print(response.text)
 
 def main():
     config_path = 'config.yml'
@@ -181,6 +313,12 @@ def main():
         elif technique['enabled'] == True and technique['technique'] == 'read_email_with_ews':
             token = get_ms_token(tenant_id, client_id, client_secret, ews_scope )
             read_email_with_ews(technique['parameters'], token)
+        elif technique['enabled'] == True and technique['technique'] == 'create_rule_with_graph':
+            token = get_ms_token(tenant_id, client_id, client_secret, graph_scope )
+            create_rule_with_graph(technique['parameters'], token)
+        elif technique['enabled'] == True and technique['technique'] == 'create_rule_with_ews':
+            token = get_ms_token(tenant_id, client_id, client_secret, ews_scope )
+            create_rule_with_ews(technique['parameters'], token)            
             
 if __name__ == "__main__":
     main()
