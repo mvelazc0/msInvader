@@ -1,4 +1,5 @@
-
+import requests
+from xml.etree import ElementTree as ET
 
  # Function to create SOAP request for FindItem
 def create_find_item_soap_request(mailbox):
