@@ -1,6 +1,7 @@
 import yaml
 from src.ews_client import *
 from src.graph_client import *
+from src.rest_client import *
 from src.auth import *
 
 ### Other
@@ -50,7 +51,10 @@ def main():
         elif technique['enabled'] == True and technique['technique'] == 'enable_email_forwarding_ews':
             token = get_ms_token(config['authentication'], technique['auth_type'])
             enable_email_forwarding_with_ews(technique['parameters'], token)            
-            
+        elif technique['enabled'] == True and technique['technique'] == 'enable_email_forwarding_rest':
+            token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], ews_scope)
+            enable_email_forwarding_rest(config['authentication']['tenant_id'], technique['parameters'], token)      
+
 if __name__ == "__main__":
     main()
         
