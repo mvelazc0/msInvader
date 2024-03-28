@@ -30,8 +30,6 @@ def get_ms_token_username_pass(tenant_id, username, password, scope):
         # 'client_id': '00000003-0000-0000-c000-000000000000', # Microsoft Graph
         #'client_id': 'de8bc8b5-d9f9-48b1-a8ad-b748da725064', # Graph Explorer
         #'client_id': '14d82eec-204b-4c2f-b7e8-296a70dab67e', # Microsoft Graph Command Line Tools	
-        
-
 
         'grant_type': 'password',
         'username': username,
@@ -39,10 +37,13 @@ def get_ms_token_username_pass(tenant_id, username, password, scope):
         'scope': scope
     }
 
-    token_r = requests.post(token_url, data=token_data)
-    print (token_r.status_code)
-    print (token_r.text)
-    return token_r.json().get('access_token')
+    response = requests.post(token_url, data=token_data)
+    token = response.json().get('access_token')
+    if token:
+        return token
+    else:
+        print ('Error obtaining token')
+        print (response.text)
 
 
 def get_ms_token(auth, auth_type, scope):

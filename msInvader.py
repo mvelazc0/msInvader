@@ -65,13 +65,11 @@ def main():
             elif technique['parameters']['method'] == 'ews':
 
                 token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], ews_scope)
-                print (token)
                 create_rule_ews(technique['parameters'], token)
 
             elif technique['parameters']['method'] == 'rest':
 
                 token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], ews_scope)
-                print (token)
                 create_rule_rest(config['authentication']['tenant_id'], technique['parameters'], token)
 
         elif technique['enabled'] == True and technique['technique'] == 'enable_email_forwarding':
@@ -79,8 +77,22 @@ def main():
             if technique['parameters']['method'] == 'rest':
 
                 token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], ews_scope)
-                print (token)
                 enable_email_forwarding_rest(config['authentication']['tenant_id'], technique['parameters'], token)      
+
+        elif technique['enabled'] == True and technique['technique'] == 'add_folder_permission':
+
+            if technique['parameters']['method'] == 'rest':
+
+                token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], ews_scope)
+                modify_folder_permission_rest(config['authentication']['tenant_id'], technique['parameters'], token, "Add-MailboxFolderPermission")      
+
+        elif technique['enabled'] == True and technique['technique'] == 'set_folder_permission':
+
+            if technique['parameters']['method'] == 'rest':
+
+                token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], ews_scope)
+                modify_folder_permission_rest(config['authentication']['tenant_id'], technique['parameters'], token, "Set-MailboxFolderPermission")      
+
 
 if __name__ == "__main__":
     main()
