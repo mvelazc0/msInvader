@@ -37,6 +37,7 @@ def create_rule_with_graph(params, token):
 
 
     graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{user_email}/mailFolders/Inbox/messageRules'
+    #graph_endpoint = f'https://graph.microsoft.com/v1.0/users/me/mailFolders/Inbox/messageRules'
 
     headers = {
         'Authorization': f'Bearer {token}',
