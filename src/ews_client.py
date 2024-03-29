@@ -30,7 +30,9 @@ def create_find_item_soap_request(mailbox):
         </soap:Body>
     </soap:Envelope>
     """
+
 def create_find_item_soap_request2(mailbox, impersonation=False):
+
     exchange_impersonation = f"""
         <t:ExchangeImpersonation>
             <t:ConnectingSID>
@@ -343,6 +345,158 @@ def enable_email_forwarding_ews(params, token):
         'Content-Type': 'text/xml; charset=utf-8',
         'Authorization': f'Bearer {token}'
     })
+
+    # Process the response
+    if response.status_code == 200:
+        print("Rule created successfully.")
+        print(response.text)
+
+    else:
+        print(f"Failed to create rule. Status code: {response.status_code}")
+        print(response.text)
+
+
+def create_find_folder_request(mailbox, folder_name, impersonation=False):
+    # https://learn.microsoft.com/en-us/exchange/client-developer/exchange-web-services/how-to-set-folder-permissions-for-another-user-by-using-ews-in-exchange
+
+    folder_name = str.lower(folder_name)
+
+    impersonation_header = ""
+
+    if impersonation:
+        impersonation_header = f'''
+        <t:ExchangeImpersonation>
+            <t:ConnectingSID>
+                <t:PrincipalName>{mailbox}</t:PrincipalName>
+            </t:ConnectingSID>
+        </t:ExchangeImpersonation>'''
+
+    return f'''<?xml version="1.0" encoding="utf-8"?>
+    <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
+                xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"
+                xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+        <soap:Header>
+            <t:RequestServerVersion Version="Exchange2016"/>
+            {impersonation_header}
+        </soap:Header>
+        <soap:Body>
+            <m:GetFolder>
+                <m:FolderShape>
+                <t:BaseShape>IdOnly</t:BaseShape>
+                <t:AdditionalProperties>
+                    <t:FieldURI FieldURI="folder:PermissionSet" />
+                </t:AdditionalProperties>
+                </m:FolderShape>
+                <m:FolderIds>
+                <t:DistinguishedFolderId Id="{folder_name}" />
+                </m:FolderIds>
+            </m:GetFolder>
+        </soap:Body>
+    </soap:Envelope>'''
+
+
+
+def create_set_folder_permissions_request(mailbox, folder_id, grantee, access_rights, impersonation= False):
+
+    # https://learn.microsoft.com/en-us/exchange/client-developer/exchange-web-services/how-to-set-folder-permissions-for-another-user-by-using-ews-in-exchange
+
+    user_id = ""
+    if grantee.lower() in ['default', 'anonymous']:
+        user_id = f'''<t:DistinguishedUser>{grantee}</t:DistinguishedUser>'''
+    else:
+        user_id = f'''<t:PrimarySmtpAddress>{grantee}</t:PrimarySmtpAddress>'''
+
+    impersonation_header = ""
+    
+    if impersonation:
+        impersonation_header = f'''
+        <t:ExchangeImpersonation>
+            <t:ConnectingSID>
+                <t:PrincipalName>{mailbox}</t:PrincipalName>
+            </t:ConnectingSID>
+        </t:ExchangeImpersonation>'''
+
+    return f'''<?xml version="1.0" encoding="utf-8"?>
+    <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
+                xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"
+                xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+        <soap:Header>
+            <t:RequestServerVersion Version="Exchange2016" />
+            {impersonation_header}
+        </soap:Header>
+        <soap:Body>
+            <m:UpdateFolder>
+                <m:FolderChanges>
+                    <t:FolderChange>
+                        <t:FolderId Id="{folder_id}" />
+                        <t:Updates>
+                            <t:SetFolderField>
+                                <t:FieldURI FieldURI="folder:PermissionSet" />
+                                <t:Folder>
+                                    <t:PermissionSet>
+                                        <t:Permissions>
+                                            <t:Permission>
+                                                <t:UserId>
+                                                    {user_id}
+                                                </t:UserId>
+                                                <t:PermissionLevel>{access_rights}</t:PermissionLevel>
+                                            </t:Permission>
+                                        </t:Permissions>
+                                    </t:PermissionSet>
+                                </t:Folder>
+                            </t:SetFolderField>
+                        </t:Updates>
+                    </t:FolderChange>
+                </m:FolderChanges>
+            </m:UpdateFolder>
+        </soap:Body>
+    </soap:Envelope>'''
+
+def modify_folder_permission_ews(params, token):
+
+    # EWS URL
+    ews_url = "https://outlook.office365.com/EWS/Exchange.asmx"
+
+    find_item_body = create_find_folder_request(params['user'], params['folder'])
+
+    # Headers
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "text/xml; charset=utf-8",
+    }
+
+    # Step 1: Find the folder id
+
+    response = requests.post(ews_url, headers = headers, data=find_item_body)
+    if response.status_code == 200:
+        root = ET.fromstring(response.text)
+        
+        namespaces = {
+            's': 'http://schemas.xmlsoap.org/soap/envelope/',
+            'm': 'http://schemas.microsoft.com/exchange/services/2006/messages',
+            't': 'http://schemas.microsoft.com/exchange/services/2006/types'
+        }
+
+        folder_id_element = root.find('.//t:FolderId', namespaces)
+        
+        if folder_id_element is not None:
+            folder_id = folder_id_element.attrib.get('Id')
+        else:
+            print("Folder ID not found in the response.")
+
+    else:
+        print(f"Failed to create rule. Status code: {response.status_code}")
+        print(response.text)
+
+
+    # Step 2: Update foler permission
+        
+    update_folder_body = create_set_folder_permissions_request (params['user'], folder_id, params['grantee'], params['access_rights'] )
+
+    response = requests.post(ews_url, headers = headers, data=update_folder_body)
 
     # Process the response
     if response.status_code == 200:

@@ -23,16 +23,6 @@ def main():
     config_path = 'config.yml'
     config = load_config(config_path)
 
-    # Accessing specific configuration parameters
-    #client_id = config['application_id']
-    #tenant_id = config['tenant_id']
-    #client_secret = config['client_secret']
-
-    # Print these values to verify they are loaded
-    #print(f"Application ID: {client_id}")
-    #print(f"Tenant ID: {tenant_id}")
-    #print(f"Client Secret: {client_secret}")
-
     ews_scope   = "https://outlook.office365.com/.default"
     graph_scope = "https://graph.microsoft.com/.default"
     #graph_scope = "https://graph.microsoft.com/MailboxSettings.ReadWrite"
@@ -85,6 +75,11 @@ def main():
 
                 token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], ews_scope)
                 modify_folder_permission_rest(config['authentication']['tenant_id'], technique['parameters'], token, "Add-MailboxFolderPermission")      
+
+            if technique['parameters']['method'] == 'ews':
+
+                token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], ews_scope)
+                modify_folder_permission_ews(technique['parameters'], token)      
 
         elif technique['enabled'] == True and technique['technique'] == 'set_folder_permission':
 

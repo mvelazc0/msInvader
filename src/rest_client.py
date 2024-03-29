@@ -84,8 +84,8 @@ def modify_folder_permission_rest(tenant_id, params, token, command):
         "CmdletName": command,
         "Parameters": {
             "AccessRights": params['access_rights'],
-            "User": params['user'],
-            "Identity": params['folder']
+            "User": params['grantee'],
+            "Identity": params['mailbox']+":\\"+params['folder']
             }
         }
     }
