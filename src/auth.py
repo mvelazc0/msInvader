@@ -48,6 +48,56 @@ def get_ms_token_username_pass(tenant_id, username, password, scope):
         print (response.text)
 
 
+def get_device_code(tenant_id, client_id, scope):
+
+    url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/devicecode"
+    data = {
+        "client_id": client_id,
+        "scope": scope
+    }
+    response = requests.post(url, data=data).json()
+    return response
+
+def get_ms_token_device_code(tenant_id, scope):
+
+    client_id = '00b41c95-dab0-4487-9791-b9d2c32c80f2' # Office 365 Management. Works to read emails Graph and EWS.
+
+    device_code_response = get_device_code(tenant_id, client_id, scope)
+
+
+    user_code = device_code_response.get("user_code")
+    device_code = device_code_response.get("device_code")
+
+    #print (user_code)
+    #print (device_code)
+
+    print("Code:", user_code)    
+    print("Submit the code on the following URL as the simulation user:", "https://microsoft.com/devicelogin")
+
+    token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+    token_data = {
+        "grant_type": "device_code",
+        "device_code": device_code,
+        "client_id": client_id
+    }
+
+    while True:
+
+        time.sleep(5)  
+        token_response = requests.post(token_url, data=token_data).json()
+
+        if "error" in token_response:
+            if token_response["error"] == "authorization_pending":
+                print("Authorization pending. Please complete the user authentication.")
+            elif token_response["error"] == "slow_down":
+                print("Slow down your polling rate.")
+                time.sleep(5)  
+            else:
+                print("Error:", token_response["error_description"])
+                break
+        else:
+            return token_response.get('access_token')
+    
 
 
 def get_ms_token(auth, auth_type, scope):
