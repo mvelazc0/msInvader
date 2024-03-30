@@ -2,35 +2,6 @@ import requests
 from xml.etree import ElementTree as ET
 
  # Function to create SOAP request for FindItem
-def create_find_item_soap_request(mailbox):
-    return f"""
-    <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                   xmlns:xsd="http://www.w3.org/2001/XMLSchema"
-                   xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
-                   xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
-        <soap:Header>
-            <t:RequestServerVersion Version="Exchange2013"/>
-            <t:ExchangeImpersonation>
-                <t:ConnectingSID>
-                    <t:PrimarySmtpAddress>{mailbox}</t:PrimarySmtpAddress>
-                </t:ConnectingSID>
-            </t:ExchangeImpersonation>
-        </soap:Header>
-        <soap:Body>
-            <FindItem xmlns="http://schemas.microsoft.com/exchange/services/2006/messages"
-                      xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"
-                      Traversal="Shallow">
-                <ItemShape>
-                    <t:BaseShape>IdOnly</t:BaseShape>
-                </ItemShape>
-                <ParentFolderIds>
-                    <t:DistinguishedFolderId Id="inbox"/>
-                </ParentFolderIds>
-            </FindItem>
-        </soap:Body>
-    </soap:Envelope>
-    """
-
 def create_find_item_soap_request2(mailbox, impersonation=False):
 
     exchange_impersonation = f"""
@@ -46,7 +17,7 @@ def create_find_item_soap_request2(mailbox, impersonation=False):
                    xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
                    xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
         <soap:Header>
-            <t:RequestServerVersion Version="Exchange2013"/>
+            <t:RequestServerVersion Version="Exchange2016"/>
             {exchange_impersonation}
         </soap:Header>
         <soap:Body>
@@ -63,39 +34,9 @@ def create_find_item_soap_request2(mailbox, impersonation=False):
         </soap:Body>
     </soap:Envelope>
     """.strip()
-
+                      
 
 # Function to create SOAP request for getting emails
-def create_get_item_soap_request(item_id, mailbox):
-
-    return f"""
-    <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                   xmlns:xsd="http://www.w3.org/2001/XMLSchema"
-                   xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
-                   xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
-        <soap:Header>
-            <t:RequestServerVersion Version="Exchange2013"/>
-            <t:ExchangeImpersonation>
-                <t:ConnectingSID>
-                    <t:PrimarySmtpAddress>{mailbox}</t:PrimarySmtpAddress>
-                </t:ConnectingSID>
-            </t:ExchangeImpersonation>
-        </soap:Header>
-        <soap:Body>
-            <GetItem xmlns="http://schemas.microsoft.com/exchange/services/2006/messages"
-                     xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
-                <ItemShape>
-                    <t:BaseShape>Default</t:BaseShape>
-                    <t:BodyType>Text</t:BodyType>
-                </ItemShape>
-                <ItemIds>
-                    <t:ItemId Id="{item_id}"/>
-                </ItemIds>
-            </GetItem>
-        </soap:Body>
-    </soap:Envelope>
-    """                       
-
 def create_get_item_soap_request2(item_id, mailbox, impersonation=False):
     exchange_impersonation = f"""
         <t:ExchangeImpersonation>
@@ -134,7 +75,7 @@ def read_email_ews(params, token):
     # EWS URL
     ews_url = "https://outlook.office365.com/EWS/Exchange.asmx"
 
-    user_email = params['user']
+    mailbox= params['mailbox']
 
     # Headers
     headers = {
@@ -143,10 +84,19 @@ def read_email_ews(params, token):
     }
 
     # Step 1: FindItem request to get email IDs
-    find_item_request = create_find_item_soap_request2(user_email)
+
+    # Check if we need exchange impersonation headers
+    if params['auth_type'] == 3:
+        find_item_request = create_find_item_soap_request2(mailbox, True)
+
+    else:
+        find_item_request = create_find_item_soap_request2(mailbox)
+
+
+
     find_item_response = requests.post(ews_url, headers=headers, data=find_item_request)
-    #print(find_item_response.status_code)
-    #print(find_item_response.text)
+    print(find_item_response.status_code)
+    print(find_item_response.text)
     find_item_root = ET.fromstring(find_item_response.content)
 
     # Extract ItemIds from FindItem response (update based on actual XML structure)
@@ -154,9 +104,18 @@ def read_email_ews(params, token):
     for elem in find_item_root.findall('.//{http://schemas.microsoft.com/exchange/services/2006/types}ItemId'):
         item_ids.append(elem.attrib['Id'])
 
+
     # Step 2: GetItem requests to read emails
     for item_id in item_ids:
-        get_item_request = create_get_item_soap_request2(item_id, user_email)
+
+        # Check if we need exchange impersonation headers
+        if params['auth_type'] == 3:
+            get_item_request = create_get_item_soap_request2(item_id, mailbox, True)
+
+        else:
+            get_item_request = create_get_item_soap_request2(item_id, mailbox)        
+
+        #get_item_request = create_get_item_soap_request2(item_id, mailbox)
         get_item_response = requests.post(ews_url, headers=headers, data=get_item_request)
         get_item_root = ET.fromstring(get_item_response.content)
 

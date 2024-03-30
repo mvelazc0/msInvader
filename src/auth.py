@@ -1,7 +1,9 @@
 import requests
+import time
 
 def get_ms_token_client(tenant_id, client_id, client_secret, scope):
 
+    print ("[!] Using client grant type")
     token_url = f'https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token'
 
     token_data = {
@@ -46,11 +48,13 @@ def get_ms_token_username_pass(tenant_id, username, password, scope):
         print (response.text)
 
 
+
+
 def get_ms_token(auth, auth_type, scope):
     
     if auth_type == 1:
-        return get_ms_token_username_pass(auth['tenant_id'] , auth['username'], auth['password'], scope)
+        return get_ms_token_username_pass(auth['tenant_id'], auth['username'], auth['password'], scope)
     elif auth_type == 2:
-        return get_ms_token_client()
+        return get_ms_token_device_code(auth['tenant_id'], scope)
     elif auth_type == 3:
-        return get_ms_token_client()
+        return get_ms_token_client(auth['tenant_id'], auth['application_id'], auth['client_secret'], scope)

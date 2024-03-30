@@ -2,11 +2,11 @@ import requests
 
 ### Graph
 
-def read_email_with_graph(params, token):
+def read_email_graph(params, token):
 
     print ("reading emails with graph")
-    user_email = params['user']
-    graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{user_email}/mailFolders/Inbox/messages'
+    mailbox = params['mailbox']
+    graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/Inbox/messages'
 
     headers = {
         'Authorization': f'Bearer {token}',
@@ -27,16 +27,16 @@ def read_email_with_graph(params, token):
         print (response.status_code)
         print (response.text)
 
-def create_rule_with_graph(params, token):
+def create_rule_graph(params, token):
 
     #https://learn.microsoft.com/en-us/graph/api/resources/messageruleactions?view=graph-rest-1.0
-    user_email = params['user']
+    mailbox = params['mailbox']
     rule_name = params['rule_name']
     forward_to = params ['forward_to']
     body_contains = params ['body_contains']
 
 
-    graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{user_email}/mailFolders/Inbox/messageRules'
+    graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/Inbox/messageRules'
     #graph_endpoint = f'https://graph.microsoft.com/v1.0/users/me/mailFolders/Inbox/messageRules'
 
     headers = {

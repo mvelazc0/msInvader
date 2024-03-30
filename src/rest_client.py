@@ -101,3 +101,35 @@ def modify_folder_permission_rest(tenant_id, params, token, command):
         print(f'Error: {response.status_code}')
         print (response.text)    
     
+def add_mailbox_permission_rest(tenant_id, params, token, command):
+
+    # https://learn.microsoft.com/en-us/exchange/recipients/mailbox-permissions?view=exchserver-2019
+    # https://learn.microsoft.com/en-us/powershell/module/exchange/add-mailboxpermission?view=exchange-ps
+
+    rest_endpoint = f'https://outlook.office365.com/adminapi/beta/{tenant_id}/InvokeCommand'
+
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+
+    data = {
+    "CmdletInput": {
+        "CmdletName": "Add-MailboxPermission",
+        "Parameters": {
+            "AccessRights": params['access_rights'],
+            "User": params['grantee'],
+            "Identity": params['mailbox']
+            }
+        }
+    }
+    response = requests.post(rest_endpoint, headers=headers, json=data)
+
+    if response.status_code == 201:
+        print ('Created!')
+        print(f'Error: {response.status_code}')
+        print (response.text)    
+
+    else:
+        print(f'Error: {response.status_code}')
+        print (response.text)    
