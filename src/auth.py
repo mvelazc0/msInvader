@@ -1,9 +1,11 @@
 import requests
 import time
+import logging
 
 def get_ms_token_client(tenant_id, client_id, client_secret, scope):
 
-    print ("[!] Using client grant type")
+    logging.info("Using client credential OAuth flow")
+
     token_url = f'https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token'
 
     token_data = {
@@ -19,7 +21,8 @@ def get_ms_token_client(tenant_id, client_id, client_secret, scope):
 
 def get_ms_token_username_pass(tenant_id, username, password, scope):
 
-    print ("[!] Using password grant type")
+    logging.info("Using resource owner password OAuth flow")
+
     token_url = f'https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token'
 
     token_data = {
@@ -59,6 +62,8 @@ def get_device_code(tenant_id, client_id, scope):
     return response
 
 def get_ms_token_device_code(tenant_id, scope):
+
+    logging.info("Using device code OAuth flow")
 
     client_id = '00b41c95-dab0-4487-9791-b9d2c32c80f2' # Office 365 Management. Works to read emails Graph and EWS.
 

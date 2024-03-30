@@ -1,10 +1,11 @@
 import requests
+import logging
 
 ### Graph
 
 def read_email_graph(params, token):
 
-    print ("reading emails with graph")
+    logging.info("reading emails with graph")
     mailbox = params['mailbox']
     graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/Inbox/messages'
 
