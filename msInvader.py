@@ -70,7 +70,7 @@ def main():
     setup_logging(logging.INFO)
     print (banner)
 
-    parser = argparse.ArgumentParser(description='msInvader - https://github.com/mvelazc0/msInvader')
+    parser = argparse.ArgumentParser(description='msInvader - M365 Adersary Simulation - https://github.com/mvelazc0/msInvader')
 
     parser.add_argument('-c', dest='config', type=str, help='Configuration file')
     args = parser.parse_args()

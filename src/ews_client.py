@@ -1,9 +1,11 @@
 import requests
 from xml.etree import ElementTree as ET
 from src.auth import get_ms_token
+import logging
 
 
 ews_scope   = "https://outlook.office365.com/.default"
+ews_url = "https://outlook.office365.com/EWS/Exchange.asmx"
 
  # Function to create SOAP request for FindItem
 def create_find_item_soap_request(mailbox, impersonation=False):
@@ -75,9 +77,7 @@ def create_get_item_soap_request(item_id, mailbox, impersonation=False):
 
 def read_email_ews(auth_config, params):
 
-    print ("Starting reading emails with ews")
-    # EWS URL
-    ews_url = "https://outlook.office365.com/EWS/Exchange.asmx"
+    logging.info("Running the read_email technique using the EWS API")
 
     token = get_ms_token(auth_config, params['auth_type'], ews_scope)
 
@@ -119,7 +119,6 @@ def read_email_ews(auth_config, params):
         else:
             get_item_request = create_get_item_soap_request(item_id, mailbox)        
 
-        #get_item_request = create_get_item_soap_request2(item_id, mailbox)
         get_item_response = requests.post(ews_url, headers=headers, data=get_item_request)
         get_item_root = ET.fromstring(get_item_response.content)
 
@@ -130,7 +129,7 @@ def read_email_ews(auth_config, params):
             print(f"Subject: {subject}\nBody: {body}\n")
 
 
-def create_forwarding_rule_xml2(user, forward_to, rule_name, body_contains, impersonation=False):
+def create_forwarding_rule_xml(user, forward_to, rule_name, body_contains, impersonation=False):
     """
     Generates SOAP XML for creating a forwarding rule in EWS.
 
@@ -186,16 +185,14 @@ def create_forwarding_rule_xml2(user, forward_to, rule_name, body_contains, impe
 
 def create_rule_ews(auth_config, params, token=False):
 
-    print ("Starting create rule with ews")
-    # EWS URL
-    ews_url = "https://outlook.office365.com/EWS/Exchange.asmx"
+    logging.info("Running the create_rule technique using the EWS API")
 
     mailbox = params['mailbox']
     forward_to =  params['forward_to']
     rule_name =  params['rule_name']
     body_contains =  params['body_contains']
 
-    soap_request = create_forwarding_rule_xml2(mailbox, forward_to, rule_name, body_contains)
+    soap_request = create_forwarding_rule_xml(mailbox, forward_to, rule_name, body_contains)
 
     if not token:
         token =  get_ms_token(auth_config, params['auth_type'], ews_scope)
@@ -247,10 +244,8 @@ def enable_email_forwarding_xml(mailbox, forwarding_address):
 
 def enable_email_forwarding_ews(params, token):
     
-    # EWS URL
-    ews_url = "https://outlook.office365.com/EWS/Exchange.asmx"
+    logging.info("Running the enable_email_forwarding technique using the EWS API")
 
-    print ("Starting email forwarding enable with ews")
     user = params['user']
     forward_to =  params['forward_to']
 
@@ -317,7 +312,7 @@ def create_find_folder_request(mailbox, folder_name, impersonation=False):
 def create_set_folder_permissions_request(mailbox, folder_id, grantee, access_rights, impersonation= False):
 
     # https://learn.microsoft.com/en-us/exchange/client-developer/exchange-web-services/how-to-set-folder-permissions-for-another-user-by-using-ews-in-exchange
-
+    
     user_id = ""
     if grantee.lower() in ['default', 'anonymous']:
         user_id = f'''<t:DistinguishedUser>{grantee}</t:DistinguishedUser>'''
@@ -373,8 +368,7 @@ def create_set_folder_permissions_request(mailbox, folder_id, grantee, access_ri
 
 def modify_folder_permission_ews(auth_config, params, token=False):
 
-    # EWS URL
-    ews_url = "https://outlook.office365.com/EWS/Exchange.asmx"
+    logging.info("Running the add_folder_permissions technique using the EWS API")
 
     find_item_body = create_find_folder_request(params['mailbox'], params['folder'])
 
@@ -412,7 +406,7 @@ def modify_folder_permission_ews(auth_config, params, token=False):
 
     # Step 2: Update foler permission
         
-    update_folder_body = create_set_folder_permissions_request (params['mailbox'], folder_id, params['grantee'], params['access_rights'] )
+    update_folder_body = create_set_folder_permissions_request(params['mailbox'], folder_id, params['grantee'], params['access_rights'])
 
     response = requests.post(ews_url, headers = headers, data=update_folder_body)
 

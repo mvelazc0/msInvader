@@ -1,5 +1,6 @@
 import requests
 from src.auth import get_ms_token
+import logging
 
 
 rest_scope   = "https://outlook.office365.com/.default"
@@ -7,6 +8,7 @@ rest_scope   = "https://outlook.office365.com/.default"
 
 def enable_email_forwarding_rest(auth_config, params, token=False):
 
+    logging.info("Running the enable_email_forwarding technique using the REST API")
 
     tenant_id = auth_config['tenant_id']
 
@@ -47,8 +49,9 @@ def enable_email_forwarding_rest(auth_config, params, token=False):
 
 def create_rule_rest(auth_config, params, token=False):
 
-    tenant_id = auth_config['tenant_id']
+    logging.info("Running the create_rule technique using the REST API")
 
+    tenant_id = auth_config['tenant_id']
 
     rest_endpoint = f'https://outlook.office365.com/adminapi/beta/{tenant_id}/InvokeCommand'
 
@@ -128,6 +131,9 @@ def add_mailbox_delegation_rest(auth_config, params):
 
     # https://learn.microsoft.com/en-us/exchange/recipients/mailbox-permissions?view=exchserver-2019
     # https://learn.microsoft.com/en-us/powershell/module/exchange/add-mailboxpermission?view=exchange-ps
+
+    logging.info("Running the add_mailbox_delegation technique using the REST API")
+
 
     tenant_id = auth_config['tenant_id']
 

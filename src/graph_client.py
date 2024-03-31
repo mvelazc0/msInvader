@@ -8,7 +8,7 @@ graph_scope = "https://graph.microsoft.com/.default"
 
 def read_email_graph(auth_config, params):
 
-    logging.info("Running the read_email technique using Graph API")
+    logging.info("Running the read_email technique using the Graph API")
 
     token = get_ms_token(auth_config, params['auth_type'], graph_scope)
 
@@ -35,6 +35,8 @@ def read_email_graph(auth_config, params):
         print (response.text)
 
 def create_rule_graph(auth_config, params):
+
+    logging.info("Running the create_rule technique using the Graph API")
 
     #graph_scope = "https://graph.microsoft.com/MailboxSettings.ReadWrite"
     #graph_scope = "MailboxSettings.ReadWrite"
