@@ -11,6 +11,7 @@ def read_email_graph(auth_config, params):
     logging.info("Running the read_email technique using Graph API")
 
     token = get_ms_token(auth_config, params['auth_type'], graph_scope)
+
     mailbox = params['mailbox']
     graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/Inbox/messages'
 
@@ -33,7 +34,7 @@ def read_email_graph(auth_config, params):
         print (response.status_code)
         print (response.text)
 
-def create_rule_graph(params, token):
+def create_rule_graph(auth_config, params):
 
     #https://learn.microsoft.com/en-us/graph/api/resources/messageruleactions?view=graph-rest-1.0
     mailbox = params['mailbox']
@@ -41,9 +42,10 @@ def create_rule_graph(params, token):
     forward_to = params ['forward_to']
     body_contains = params ['body_contains']
 
-
     graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/Inbox/messageRules'
     #graph_endpoint = f'https://graph.microsoft.com/v1.0/users/me/mailFolders/Inbox/messageRules'
+
+    token = get_ms_token(auth_config, params['auth_type'], graph_scope)
 
     headers = {
         'Authorization': f'Bearer {token}',

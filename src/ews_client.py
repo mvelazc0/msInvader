@@ -133,56 +133,6 @@ def read_email_ews(auth_config, params):
             print(f"Subject: {subject}\nBody: {body}\n")
 
 
-def create_forwarding_rule_xml(user, forward_to, rule_name, body_contains):
-    """
-    Generates SOAP XML for creating a forwarding rule in EWS.
-
-    :param forward_to: The email address to forward emails to.
-    :param rule_name: The name of the forwarding rule.
-    :param body_contains: A string that must be contained in the email body to trigger the rule.
-    :return: A string containing the SOAP XML.
-    """
-    return f'''<?xml version="1.0" encoding="utf-8"?>
-    <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
-                xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"
-                xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-        <soap:Header>
-            <t:RequestServerVersion Version="Exchange2016" />
-            <t:ExchangeImpersonation>
-            <t:ConnectingSID>
-                    <t:PrimarySmtpAddress>{user}</t:PrimarySmtpAddress>
-            </t:ConnectingSID>
-            </t:ExchangeImpersonation>
-        </soap:Header>
-        <soap:Body>
-            <m:UpdateInboxRules>
-                <m:Operations>
-                    <t:CreateRuleOperation>
-                        <t:Rule>
-                            <t:DisplayName>{rule_name}</t:DisplayName>
-                            <t:Priority>1</t:Priority>
-                            <t:IsEnabled>true</t:IsEnabled>
-                            <t:Conditions>
-                                <t:ContainsBodyStrings>
-                                    <t:String>{body_contains}</t:String>
-                                </t:ContainsBodyStrings>
-                            </t:Conditions>
-                            <t:Exceptions />
-                            <t:Actions>
-                                <t:ForwardToRecipients>
-                                    <t:Address>
-                                    <t:EmailAddress>{forward_to}</t:EmailAddress>
-                                    </t:Address>
-                                </t:ForwardToRecipients>
-                            </t:Actions>
-                        </t:Rule>
-                    </t:CreateRuleOperation>
-                </m:Operations>
-            </m:UpdateInboxRules>
-        </soap:Body>
-    </soap:Envelope>'''
-
 def create_forwarding_rule_xml2(user, forward_to, rule_name, body_contains, impersonation=False):
     """
     Generates SOAP XML for creating a forwarding rule in EWS.
@@ -237,18 +187,21 @@ def create_forwarding_rule_xml2(user, forward_to, rule_name, body_contains, impe
         </soap:Body>
     </soap:Envelope>'''
 
-def create_rule_ews(params, token):
+def create_rule_ews(auth_config, params, token=False):
 
     print ("Starting create rule with ews")
     # EWS URL
     ews_url = "https://outlook.office365.com/EWS/Exchange.asmx"
 
-    user = params['user']
+    mailbox = params['mailbox']
     forward_to =  params['forward_to']
     rule_name =  params['rule_name']
     body_contains =  params['body_contains']
 
-    soap_request = create_forwarding_rule_xml2(user, forward_to, rule_name, body_contains)
+    soap_request = create_forwarding_rule_xml2(mailbox, forward_to, rule_name, body_contains)
+
+    if not token:
+        token =  get_ms_token(auth_config, params['auth_type'], ews_scope)
 
     # Send the EWS request with OAuth token
     response = requests.post(ews_url, data=soap_request, headers={

@@ -105,11 +105,11 @@ def get_ms_token_device_code(tenant_id, scope):
     
 
 
-def get_ms_token(auth, auth_type, scope):
+def get_ms_token(auth_config, auth_type, scope):
     
     if auth_type == 1:
-        return get_ms_token_username_pass(auth['tenant_id'], auth['username'], auth['password'], scope)
+        return get_ms_token_username_pass(auth_config['tenant_id'], auth_config['username'], auth_config['password'], scope)
     elif auth_type == 2:
-        return get_ms_token_device_code(auth['tenant_id'], scope)
+        return get_ms_token_device_code(auth_config['tenant_id'], scope)
     elif auth_type == 3:
-        return get_ms_token_client(auth['tenant_id'], auth['application_id'], auth['client_secret'], scope)
+        return get_ms_token_client(auth_config['tenant_id'], auth_config['application_id'], auth_config['client_secret'], scope)

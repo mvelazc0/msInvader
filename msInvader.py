@@ -96,39 +96,31 @@ def main():
 
             if technique['parameters']['method'] == 'graph':
 
-                #token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], graph_scope)
-                #read_email_graph(technique['parameters'], token)
                 read_email_graph(config['authentication'], technique['parameters'])
 
             elif technique['parameters']['method'] == 'ews':
 
-                #token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], ews_scope)
                 read_email_ews(config['authentication'], technique['parameters'])
-
 
         elif technique['technique'] == 'create_rule':
 
             if technique['parameters']['method'] == 'graph':
 
-                token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], graph_scope)
-                create_rule_graph(technique['parameters'], token)
+                create_rule_graph(config['authentication'], technique['parameters'])
 
             elif technique['parameters']['method'] == 'ews':
 
-                token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], ews_scope)
-                create_rule_ews(technique['parameters'], token)
+                create_rule_ews(config['authentication'], technique['parameters'])
 
             elif technique['parameters']['method'] == 'rest':
 
-                token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], ews_scope)
-                create_rule_rest(config['authentication']['tenant_id'], technique['parameters'], token)
+                create_rule_rest(config['authentication'], technique['parameters'])
 
         elif technique['technique'] == 'enable_email_forwarding':
 
             if technique['parameters']['method'] == 'rest':
 
-                token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], ews_scope)
-                enable_email_forwarding_rest(config['authentication']['tenant_id'], technique['parameters'], token)      
+                enable_email_forwarding_rest(config['authentication'], technique['parameters'])      
 
         elif technique['technique'] == 'add_folder_permission':
 
@@ -148,6 +140,14 @@ def main():
 
                 token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], ews_scope)
                 modify_folder_permission_rest(config['authentication']['tenant_id'], technique['parameters'], token, "Set-MailboxFolderPermission")      
+
+
+        elif technique['technique'] == 'add_mailbox_delegation':
+
+            if technique['parameters']['method'] == 'rest':
+
+                add_mailbox_delegation_rest(config['authentication'], technique['parameters'])      
+
 
 
 if __name__ == "__main__":
