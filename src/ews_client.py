@@ -81,7 +81,6 @@ def read_email_ews(auth_config, params):
 
     token = get_ms_token(auth_config, params['auth_type'], ews_scope)
 
-
     mailbox= params['mailbox']
 
     # Headers
@@ -98,8 +97,6 @@ def read_email_ews(auth_config, params):
 
     else:
         find_item_request = create_find_item_soap_request(mailbox)
-
-
 
     find_item_response = requests.post(ews_url, headers=headers, data=find_item_request)
     print(find_item_response.status_code)
@@ -374,12 +371,14 @@ def create_set_folder_permissions_request(mailbox, folder_id, grantee, access_ri
         </soap:Body>
     </soap:Envelope>'''
 
-def modify_folder_permission_ews(params, token):
+def modify_folder_permission_ews(auth_config, params, token=False):
 
     # EWS URL
     ews_url = "https://outlook.office365.com/EWS/Exchange.asmx"
 
-    find_item_body = create_find_folder_request(params['user'], params['folder'])
+    find_item_body = create_find_folder_request(params['mailbox'], params['folder'])
+
+    token = get_ms_token(auth_config, params['auth_type'], ews_scope)
 
     # Headers
     headers = {
@@ -413,7 +412,7 @@ def modify_folder_permission_ews(params, token):
 
     # Step 2: Update foler permission
         
-    update_folder_body = create_set_folder_permissions_request (params['user'], folder_id, params['grantee'], params['access_rights'] )
+    update_folder_body = create_set_folder_permissions_request (params['mailbox'], folder_id, params['grantee'], params['access_rights'] )
 
     response = requests.post(ews_url, headers = headers, data=update_folder_body)
 

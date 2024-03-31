@@ -83,11 +83,6 @@ def main():
     config = load_config(config_path)
     enabled_techniques = [tech for tech in config['techniques'] if tech['enabled']]
     logging.info(f"Identified {len(enabled_techniques)} enabled technique(s) on configuration file")
-
-    ews_scope   = "https://outlook.office365.com/.default"
-    graph_scope = "https://graph.microsoft.com/.default"
-    #graph_scope = "https://graph.microsoft.com/MailboxSettings.ReadWrite"
-    #graph_scope = "MailboxSettings.ReadWrite"
     logging.info("Starting technique execution")
 
     for technique in enabled_techniques:
@@ -126,28 +121,17 @@ def main():
 
             if technique['parameters']['method'] == 'rest':
 
-                token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], ews_scope)
-                modify_folder_permission_rest(config['authentication']['tenant_id'], technique['parameters'], token, "Add-MailboxFolderPermission")      
+                modify_folder_permission_rest(config['authentication'], technique['parameters'])      
 
             if technique['parameters']['method'] == 'ews':
-
-                token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], ews_scope)
-                modify_folder_permission_ews(technique['parameters'], token)      
-
-        elif technique['technique'] == 'set_folder_permission':
-
-            if technique['parameters']['method'] == 'rest':
-
-                token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], ews_scope)
-                modify_folder_permission_rest(config['authentication']['tenant_id'], technique['parameters'], token, "Set-MailboxFolderPermission")      
-
+    
+                modify_folder_permission_ews(config['authentication'], technique['parameters'])      
 
         elif technique['technique'] == 'add_mailbox_delegation':
 
             if technique['parameters']['method'] == 'rest':
 
                 add_mailbox_delegation_rest(config['authentication'], technique['parameters'])      
-
 
 
 if __name__ == "__main__":

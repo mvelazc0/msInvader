@@ -36,6 +36,9 @@ def read_email_graph(auth_config, params):
 
 def create_rule_graph(auth_config, params):
 
+    #graph_scope = "https://graph.microsoft.com/MailboxSettings.ReadWrite"
+    #graph_scope = "MailboxSettings.ReadWrite"
+
     #https://learn.microsoft.com/en-us/graph/api/resources/messageruleactions?view=graph-rest-1.0
     mailbox = params['mailbox']
     rule_name = params['rule_name']

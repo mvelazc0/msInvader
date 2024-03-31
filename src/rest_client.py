@@ -83,10 +83,19 @@ def create_rule_rest(auth_config, params, token=False):
         print (response.text)    
     
 
-def modify_folder_permission_rest(tenant_id, params, token, command):
+def modify_folder_permission_rest(auth_config, params, token=False):
+
+    tenant_id = auth_config['tenant_id']
 
     rest_endpoint = f'https://outlook.office365.com/adminapi/beta/{tenant_id}/InvokeCommand'
 
+    if params['grantee'].lower() in ['default', 'anonymous']:
+        command = "Set-MailboxFolderPermission"
+    else:
+        command = "Add-MailboxFolderPermission"
+
+    if not token:
+        token = get_ms_token(auth_config, params['auth_type'], rest_scope)
 
     headers = {
         'Authorization': f'Bearer {token}',
