@@ -1,8 +1,12 @@
 import requests
 from xml.etree import ElementTree as ET
+from src.auth import get_ms_token
+
+
+ews_scope   = "https://outlook.office365.com/.default"
 
  # Function to create SOAP request for FindItem
-def create_find_item_soap_request2(mailbox, impersonation=False):
+def create_find_item_soap_request(mailbox, impersonation=False):
 
     exchange_impersonation = f"""
         <t:ExchangeImpersonation>
@@ -37,7 +41,7 @@ def create_find_item_soap_request2(mailbox, impersonation=False):
                       
 
 # Function to create SOAP request for getting emails
-def create_get_item_soap_request2(item_id, mailbox, impersonation=False):
+def create_get_item_soap_request(item_id, mailbox, impersonation=False):
     exchange_impersonation = f"""
         <t:ExchangeImpersonation>
             <t:ConnectingSID>
@@ -69,11 +73,14 @@ def create_get_item_soap_request2(item_id, mailbox, impersonation=False):
     </soap:Envelope>
     """.strip()
 
-def read_email_ews(params, token):
+def read_email_ews(auth_config, params):
 
     print ("Starting reading emails with ews")
     # EWS URL
     ews_url = "https://outlook.office365.com/EWS/Exchange.asmx"
+
+    token = get_ms_token(auth_config, params['auth_type'], ews_scope)
+
 
     mailbox= params['mailbox']
 
@@ -87,10 +94,10 @@ def read_email_ews(params, token):
 
     # Check if we need exchange impersonation headers
     if params['auth_type'] == 3:
-        find_item_request = create_find_item_soap_request2(mailbox, True)
+        find_item_request = create_find_item_soap_request(mailbox, True)
 
     else:
-        find_item_request = create_find_item_soap_request2(mailbox)
+        find_item_request = create_find_item_soap_request(mailbox)
 
 
 
@@ -110,10 +117,10 @@ def read_email_ews(params, token):
 
         # Check if we need exchange impersonation headers
         if params['auth_type'] == 3:
-            get_item_request = create_get_item_soap_request2(item_id, mailbox, True)
+            get_item_request = create_get_item_soap_request(item_id, mailbox, True)
 
         else:
-            get_item_request = create_get_item_soap_request2(item_id, mailbox)        
+            get_item_request = create_get_item_soap_request(item_id, mailbox)        
 
         #get_item_request = create_get_item_soap_request2(item_id, mailbox)
         get_item_response = requests.post(ews_url, headers=headers, data=get_item_request)

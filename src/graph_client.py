@@ -1,11 +1,16 @@
 import requests
 import logging
+from src.auth import get_ms_token
 
 ### Graph
 
-def read_email_graph(params, token):
+graph_scope = "https://graph.microsoft.com/.default"
 
-    logging.info("reading emails with graph")
+def read_email_graph(auth_config, params):
+
+    logging.info("Running the read_email technique using Graph API")
+
+    token = get_ms_token(auth_config, params['auth_type'], graph_scope)
     mailbox = params['mailbox']
     graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/Inbox/messages'
 

@@ -84,30 +84,29 @@ def main():
     enabled_techniques = [tech for tech in config['techniques'] if tech['enabled']]
     logging.info(f"Identified {len(enabled_techniques)} enabled technique(s) on configuration file")
 
-
-    
     ews_scope   = "https://outlook.office365.com/.default"
     graph_scope = "https://graph.microsoft.com/.default"
     #graph_scope = "https://graph.microsoft.com/MailboxSettings.ReadWrite"
     #graph_scope = "MailboxSettings.ReadWrite"
-
-
     logging.info("Starting technique execution")
-    for technique in config['techniques']:
 
-        if technique['enabled'] == True and technique['technique'] == 'read_email':
+    for technique in enabled_techniques:
+
+        if technique['technique'] == 'read_email':
+
             if technique['parameters']['method'] == 'graph':
 
-                token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], graph_scope)
-                read_email_graph(technique['parameters'], token)
+                #token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], graph_scope)
+                #read_email_graph(technique['parameters'], token)
+                read_email_graph(config['authentication'], technique['parameters'])
 
             elif technique['parameters']['method'] == 'ews':
 
-                token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], ews_scope)
-                read_email_ews(technique['parameters'], token)
+                #token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], ews_scope)
+                read_email_ews(config['authentication'], technique['parameters'])
 
-        
-        elif technique['enabled'] == True and technique['technique'] == 'create_rule':
+
+        elif technique['technique'] == 'create_rule':
 
             if technique['parameters']['method'] == 'graph':
 
@@ -124,14 +123,14 @@ def main():
                 token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], ews_scope)
                 create_rule_rest(config['authentication']['tenant_id'], technique['parameters'], token)
 
-        elif technique['enabled'] == True and technique['technique'] == 'enable_email_forwarding':
+        elif technique['technique'] == 'enable_email_forwarding':
 
             if technique['parameters']['method'] == 'rest':
 
                 token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], ews_scope)
                 enable_email_forwarding_rest(config['authentication']['tenant_id'], technique['parameters'], token)      
 
-        elif technique['enabled'] == True and technique['technique'] == 'add_folder_permission':
+        elif technique['technique'] == 'add_folder_permission':
 
             if technique['parameters']['method'] == 'rest':
 
@@ -143,7 +142,7 @@ def main():
                 token = get_ms_token(config['authentication'], technique['parameters']['auth_type'], ews_scope)
                 modify_folder_permission_ews(technique['parameters'], token)      
 
-        elif technique['enabled'] == True and technique['technique'] == 'set_folder_permission':
+        elif technique['technique'] == 'set_folder_permission':
 
             if technique['parameters']['method'] == 'rest':
 
