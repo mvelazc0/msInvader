@@ -7,7 +7,8 @@ import logging
 ews_scope   = "https://outlook.office365.com/.default"
 ews_url = "https://outlook.office365.com/EWS/Exchange.asmx"
 
- # Function to create SOAP request for FindItem
+## Functions to create SOAP requets XMLs
+
 def create_find_item_soap_request(mailbox, impersonation=False):
 
     exchange_impersonation = f"""
@@ -41,8 +42,6 @@ def create_find_item_soap_request(mailbox, impersonation=False):
     </soap:Envelope>
     """.strip()
                       
-
-# Function to create SOAP request for getting emails
 def create_get_item_soap_request(item_id, mailbox, impersonation=False):
     exchange_impersonation = f"""
         <t:ExchangeImpersonation>
@@ -75,61 +74,7 @@ def create_get_item_soap_request(item_id, mailbox, impersonation=False):
     </soap:Envelope>
     """.strip()
 
-def read_email_ews(auth_config, params):
-
-    logging.info("Running the read_email technique using the EWS API")
-
-    token = get_ms_token(auth_config, params['auth_type'], ews_scope)
-
-    mailbox= params['mailbox']
-
-    # Headers
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "text/xml; charset=utf-8"
-    }
-
-    # Step 1: FindItem request to get email IDs
-
-    # Check if we need exchange impersonation headers
-    if params['auth_type'] == 3:
-        find_item_request = create_find_item_soap_request(mailbox, True)
-
-    else:
-        find_item_request = create_find_item_soap_request(mailbox)
-
-    find_item_response = requests.post(ews_url, headers=headers, data=find_item_request)
-    print(find_item_response.status_code)
-    print(find_item_response.text)
-    find_item_root = ET.fromstring(find_item_response.content)
-
-    # Extract ItemIds from FindItem response (update based on actual XML structure)
-    item_ids = []
-    for elem in find_item_root.findall('.//{http://schemas.microsoft.com/exchange/services/2006/types}ItemId'):
-        item_ids.append(elem.attrib['Id'])
-
-
-    # Step 2: GetItem requests to read emails
-    for item_id in item_ids:
-
-        # Check if we need exchange impersonation headers
-        if params['auth_type'] == 3:
-            get_item_request = create_get_item_soap_request(item_id, mailbox, True)
-
-        else:
-            get_item_request = create_get_item_soap_request(item_id, mailbox)        
-
-        get_item_response = requests.post(ews_url, headers=headers, data=get_item_request)
-        get_item_root = ET.fromstring(get_item_response.content)
-
-        # Extract email details from GetItem response (update based on actual XML structure)
-        for message in get_item_root.findall('.//{http://schemas.microsoft.com/exchange/services/2006/types}Message'):
-            subject = message.find('{http://schemas.microsoft.com/exchange/services/2006/types}Subject').text
-            body = message.find('{http://schemas.microsoft.com/exchange/services/2006/types}Body').text
-            print(f"Subject: {subject}\nBody: {body}\n")
-
-
-def create_forwarding_rule_xml(user, forward_to, rule_name, body_contains, impersonation=False):
+def create_forwarding_rule_soap_request(mailbox, forward_to, rule_name, body_contains, impersonation=False):
     """
     Generates SOAP XML for creating a forwarding rule in EWS.
 
@@ -142,7 +87,7 @@ def create_forwarding_rule_xml(user, forward_to, rule_name, body_contains, imper
     exchange_impersonation = f"""
         <t:ExchangeImpersonation>
             <t:ConnectingSID>
-                <t:PrimarySmtpAddress>{user}</t:PrimarySmtpAddress>
+                <t:PrimarySmtpAddress>{mailbox}</t:PrimarySmtpAddress>
             </t:ConnectingSID>
         </t:ExchangeImpersonation>""" if impersonation else ""
 
@@ -183,36 +128,14 @@ def create_forwarding_rule_xml(user, forward_to, rule_name, body_contains, imper
         </soap:Body>
     </soap:Envelope>'''
 
-def create_rule_ews(auth_config, params, token=False):
+def enable_email_forwarding_soap_request(mailbox, forwarding_address, impersonation=False):
 
-    logging.info("Running the create_rule technique using the EWS API")
-
-    mailbox = params['mailbox']
-    forward_to =  params['forward_to']
-    rule_name =  params['rule_name']
-    body_contains =  params['body_contains']
-
-    soap_request = create_forwarding_rule_xml(mailbox, forward_to, rule_name, body_contains)
-
-    if not token:
-        token =  get_ms_token(auth_config, params['auth_type'], ews_scope)
-
-    # Send the EWS request with OAuth token
-    response = requests.post(ews_url, data=soap_request, headers={
-        'Content-Type': 'text/xml; charset=utf-8',
-        'Authorization': f'Bearer {token}'
-    })
-
-    # Process the response
-    if response.status_code == 200:
-        print("Rule created successfully.")
-        print(response.text)
-
-    else:
-        print(f"Failed to create rule. Status code: {response.status_code}")
-        print(response.text)
-
-def enable_email_forwarding_xml(mailbox, forwarding_address):
+    exchange_impersonation = f"""
+        <t:ExchangeImpersonation>
+            <t:ConnectingSID>
+                <t:PrimarySmtpAddress>{mailbox}</t:PrimarySmtpAddress>
+            </t:ConnectingSID>
+        </t:ExchangeImpersonation>""" if impersonation else ""
 
     return f'''<?xml version="1.0" encoding="utf-8"?>
     <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -221,11 +144,7 @@ def enable_email_forwarding_xml(mailbox, forwarding_address):
                    xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
       <soap:Header>
         <t:RequestServerVersion Version="Exchange2016" />
-        <t:ExchangeImpersonation>
-          <t:ConnectingSID>
-            <t:PrimarySmtpAddress>{mailbox}</t:PrimarySmtpAddress>
-          </t:ConnectingSID>
-        </t:ExchangeImpersonation>
+        {exchange_impersonation}
       </soap:Header>
       <soap:Body>
         <UpdateInboxRules xmlns="http://schemas.microsoft.com/exchange/services/2006/messages"
@@ -242,32 +161,7 @@ def enable_email_forwarding_xml(mailbox, forwarding_address):
       </soap:Body>
     </soap:Envelope>'''
 
-def enable_email_forwarding_ews(params, token):
-    
-    logging.info("Running the enable_email_forwarding technique using the EWS API")
-
-    user = params['user']
-    forward_to =  params['forward_to']
-
-    soap_request = enable_email_forwarding_xml(user, forward_to)
-
-    # Send the EWS request with OAuth token
-    response = requests.post(ews_url, data=soap_request, headers={
-        'Content-Type': 'text/xml; charset=utf-8',
-        'Authorization': f'Bearer {token}'
-    })
-
-    # Process the response
-    if response.status_code == 200:
-        print("Rule created successfully.")
-        print(response.text)
-
-    else:
-        print(f"Failed to create rule. Status code: {response.status_code}")
-        print(response.text)
-
-
-def create_find_folder_request(mailbox, folder_name, impersonation=False):
+def create_find_folder_soap_request(mailbox, folder_name, impersonation=False):
     # https://learn.microsoft.com/en-us/exchange/client-developer/exchange-web-services/how-to-set-folder-permissions-for-another-user-by-using-ews-in-exchange
 
     folder_name = str.lower(folder_name)
@@ -307,9 +201,7 @@ def create_find_folder_request(mailbox, folder_name, impersonation=False):
         </soap:Body>
     </soap:Envelope>'''
 
-
-
-def create_set_folder_permissions_request(mailbox, folder_id, grantee, access_rights, impersonation= False):
+def modify_folder_permissions_soap_request(mailbox, folder_id, grantee, access_rights, impersonation= False):
 
     # https://learn.microsoft.com/en-us/exchange/client-developer/exchange-web-services/how-to-set-folder-permissions-for-another-user-by-using-ews-in-exchange
     
@@ -366,11 +258,120 @@ def create_set_folder_permissions_request(mailbox, folder_id, grantee, access_ri
         </soap:Body>
     </soap:Envelope>'''
 
+## Functions to execute techniques
+
+def read_email_ews(auth_config, params):
+
+    logging.info("Running the read_email technique using the EWS API")
+
+    token = get_ms_token(auth_config, params['auth_type'], ews_scope)
+
+    mailbox= params['mailbox']
+
+    # Headers
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "text/xml; charset=utf-8"
+    }
+
+    # Step 1: FindItem request to get email IDs
+
+    # Check if we need exchange impersonation headers
+    if params['auth_type'] == 3:
+        find_item_request = create_find_item_soap_request(mailbox, True)
+
+    else:
+        find_item_request = create_find_item_soap_request(mailbox)
+
+    find_item_response = requests.post(ews_url, headers=headers, data=find_item_request)
+    print(find_item_response.status_code)
+    print(find_item_response.text)
+    find_item_root = ET.fromstring(find_item_response.content)
+
+    # Extract ItemIds from FindItem response (update based on actual XML structure)
+    item_ids = []
+    for elem in find_item_root.findall('.//{http://schemas.microsoft.com/exchange/services/2006/types}ItemId'):
+        item_ids.append(elem.attrib['Id'])
+
+
+    # Step 2: GetItem requests to read emails
+    for item_id in item_ids:
+
+        # Check if we need exchange impersonation headers
+        if params['auth_type'] == 3:
+            get_item_request = create_get_item_soap_request(item_id, mailbox, True)
+
+        else:
+            get_item_request = create_get_item_soap_request(item_id, mailbox)        
+
+        get_item_response = requests.post(ews_url, headers=headers, data=get_item_request)
+        get_item_root = ET.fromstring(get_item_response.content)
+
+        # Extract email details from GetItem response (update based on actual XML structure)
+        for message in get_item_root.findall('.//{http://schemas.microsoft.com/exchange/services/2006/types}Message'):
+            subject = message.find('{http://schemas.microsoft.com/exchange/services/2006/types}Subject').text
+            body = message.find('{http://schemas.microsoft.com/exchange/services/2006/types}Body').text
+            print(f"Subject: {subject}\nBody: {body}\n")
+
+
+def create_rule_ews(auth_config, params, token=False):
+
+    logging.info("Running the create_rule technique using the EWS API")
+
+    mailbox = params['mailbox']
+    forward_to =  params['forward_to']
+    rule_name =  params['rule_name']
+    body_contains =  params['body_contains']
+
+    soap_request = create_forwarding_rule_soap_request(mailbox, forward_to, rule_name, body_contains)
+
+    if not token:
+        token =  get_ms_token(auth_config, params['auth_type'], ews_scope)
+
+    # Send the EWS request with OAuth token
+    response = requests.post(ews_url, data=soap_request, headers={
+        'Content-Type': 'text/xml; charset=utf-8',
+        'Authorization': f'Bearer {token}'
+    })
+
+    # Process the response
+    if response.status_code == 200:
+        print("Rule created successfully.")
+        print(response.text)
+
+    else:
+        print(f"Failed to create rule. Status code: {response.status_code}")
+        print(response.text)
+
+def enable_email_forwarding_ews(params, token):
+    
+    logging.info("Running the enable_email_forwarding technique using the EWS API")
+
+    user = params['user']
+    forward_to =  params['forward_to']
+
+    soap_request = enable_email_forwarding_soap_request(user, forward_to)
+
+    # Send the EWS request with OAuth token
+    response = requests.post(ews_url, data=soap_request, headers={
+        'Content-Type': 'text/xml; charset=utf-8',
+        'Authorization': f'Bearer {token}'
+    })
+
+    # Process the response
+    if response.status_code == 200:
+        print("Rule created successfully.")
+        print(response.text)
+
+    else:
+        print(f"Failed to create rule. Status code: {response.status_code}")
+        print(response.text)
+
 def modify_folder_permission_ews(auth_config, params, token=False):
 
     logging.info("Running the add_folder_permissions technique using the EWS API")
 
-    find_item_body = create_find_folder_request(params['mailbox'], params['folder'])
+    find_item_body = create_find_folder_soap_request(params['mailbox'], params['folder'])
 
     token = get_ms_token(auth_config, params['auth_type'], ews_scope)
 
@@ -406,7 +407,7 @@ def modify_folder_permission_ews(auth_config, params, token=False):
 
     # Step 2: Update foler permission
         
-    update_folder_body = create_set_folder_permissions_request(params['mailbox'], folder_id, params['grantee'], params['access_rights'])
+    update_folder_body = modify_folder_permissions_soap_request(params['mailbox'], folder_id, params['grantee'], params['access_rights'])
 
     response = requests.post(ews_url, headers = headers, data=update_folder_body)
 

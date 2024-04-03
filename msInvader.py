@@ -96,6 +96,10 @@ def main():
             elif technique['parameters']['method'] == 'ews':
 
                 read_email_ews(config['authentication'], technique['parameters'])
+            
+            elif technique['parameters']['method'] == 'rest':
+                # Exchange online management does not support Get-Message on M365
+                logging.error("Technique method not supported")
 
         elif technique['technique'] == 'create_rule':
 
@@ -132,6 +136,13 @@ def main():
             if technique['parameters']['method'] == 'rest':
 
                 add_mailbox_delegation_rest(config['authentication'], technique['parameters'])      
+
+        elif technique['technique'] == 'run_compliance_search':
+
+            if technique['parameters']['method'] == 'rest':
+
+                run_compliance_search_rest(config['authentication'], technique['parameters'])      
+
 
 
 if __name__ == "__main__":

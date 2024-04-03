@@ -21,6 +21,8 @@ def get_ms_token_client(tenant_id, client_id, client_secret, scope):
 
 def get_ms_token_username_pass(tenant_id, username, password, scope):
 
+    # https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth-ropc
+
     logging.info("Using resource owner password OAuth flow")
 
     token_url = f'https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token'
@@ -28,7 +30,8 @@ def get_ms_token_username_pass(tenant_id, username, password, scope):
     token_data = {
 
         #'client_id': '1950a258-227b-4e31-a9cf-717495945fc2', # Microsoft Azure PowerShell
-        'client_id': '00b41c95-dab0-4487-9791-b9d2c32c80f2',  # Office 365 Management. Works to read emails Graph and EWS.
+        #'client_id': '00b41c95-dab0-4487-9791-b9d2c32c80f2',  # Office 365 Management. Works to read emails Graph and EWS.
+        'client_id': 'd3590ed6-52b3-4102-aeff-aad2292ab01c',  # Microsoft Office. Also works to read emails Graph and EWS.
         #'client_id': '00000002-0000-0ff1-ce00-000000000000', # Office 365 Exchange Online
         #'client_id': '00000006-0000-0ff1-ce00-000000000000', # Microsoft Office 365 Portal
         #'client_id': 'fb78d390-0c51-40cd-8e17-fdbfab77341b', # Microsoft Exchange REST API Based Powershell
