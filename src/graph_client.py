@@ -19,20 +19,22 @@ def read_email_graph(auth_config, params):
         'Authorization': f'Bearer {token}',
         'Content-Type': 'application/json'
     }
-    
+    short_endpoint = graph_endpoint.replace("https://graph.microsoft.com","")
+    logging.info(f"Submitting GET request to {short_endpoint}")
     response = requests.get(graph_endpoint, headers=headers)
 
     if response.status_code == 200:
-        print ("OK!")
+        logging.info("200 OK")
         messages = response.json().get('value', [])
-        for message in messages:
-            print(message.get('subject'), message.get('from'))
-            body_content = message.get('body', {}).get('content', '')
+        for message in messages[:params['limit']]:
+            #print(message.get('subject'), message.get('from'))
+            #body_content = message.get('body', {}).get('content', '')
+            logging.info(f"Read email with subject: {message.get('subject')}")
             #print("Body:", body_content)
 
     else:
-        print (response.status_code)
-        print (response.text)
+        logging.error(f"Operation failed with status code {response.status_code }")
+        #print (response.text)
 
 def create_rule_graph(auth_config, params):
 
@@ -77,11 +79,13 @@ def create_rule_graph(auth_config, params):
             "stopProcessingRules": True
         }
     }
-
+    
+    short_endpoint = graph_endpoint.replace("https://graph.microsoft.com","")
+    logging.info(f"Submitting POSt request to {short_endpoint}")
     response = requests.post(graph_endpoint, headers=headers, json=data)
 
     if response.status_code == 201:
-        print ('Created!')
+        logging.info("201 - Created")
     else:
-        print(f'Error: {response.status_code}')
-        print (response.text)    
+        logging.error(f"Operation failed with status code {response.status_code }")
+        #print (response.text)    

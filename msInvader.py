@@ -49,9 +49,14 @@ def setup_logging(level):
         logging.INFO: "%(asctime)s [+] %(message)s",
         logging.ERROR: "%(asctime)s [!] %(message)s",
         "DEFAULT": "%(asctime)s [%(levelname)s] - %(message)s",
-    }
-    
+    }    
+    custom_time_format = "%Y-%m-%d %H:%M:%S"
+
     class CustomFormatter(logging.Formatter):
+
+        def __init__(self, fmt=None, datefmt=None, style='%'):
+            super().__init__(fmt, datefmt=custom_time_format, style=style)        
+
         def format(self, record):
             # Set the default format
             self._style._fmt = custom_formats.get(record.levelno, custom_formats["DEFAULT"])

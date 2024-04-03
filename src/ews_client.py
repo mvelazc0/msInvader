@@ -283,9 +283,14 @@ def read_email_ews(auth_config, params):
     else:
         find_item_request = create_find_item_soap_request(mailbox)
 
+    logging.info("Calling the FindItem operation on the EWS API")
     find_item_response = requests.post(ews_url, headers=headers, data=find_item_request)
-    print(find_item_response.status_code)
-    print(find_item_response.text)
+    if find_item_response.status_code == 200:
+        logging.info("200 OK")
+    else:
+        logging.error(f"FindItem operation failed with status code {find_item_response.status_code }")
+    #print(find_item_response.status_code)
+    #print(find_item_response.text)
     find_item_root = ET.fromstring(find_item_response.content)
 
     # Extract ItemIds from FindItem response (update based on actual XML structure)
@@ -295,7 +300,8 @@ def read_email_ews(auth_config, params):
 
 
     # Step 2: GetItem requests to read emails
-    for item_id in item_ids:
+    logging.info("Calling the GetItem operation on the EWS API for found emails")
+    for item_id in item_ids[:params['limit']]:
 
         # Check if we need exchange impersonation headers
         if params['auth_type'] == 3:
@@ -304,6 +310,7 @@ def read_email_ews(auth_config, params):
         else:
             get_item_request = create_get_item_soap_request(item_id, mailbox)        
 
+        #logging.info("Calling the GetItem operation on the EWS API")
         get_item_response = requests.post(ews_url, headers=headers, data=get_item_request)
         get_item_root = ET.fromstring(get_item_response.content)
 
@@ -311,7 +318,8 @@ def read_email_ews(auth_config, params):
         for message in get_item_root.findall('.//{http://schemas.microsoft.com/exchange/services/2006/types}Message'):
             subject = message.find('{http://schemas.microsoft.com/exchange/services/2006/types}Subject').text
             body = message.find('{http://schemas.microsoft.com/exchange/services/2006/types}Body').text
-            print(f"Subject: {subject}\nBody: {body}\n")
+            logging.info(f"Read email with subject: {subject}")
+            #print(f"Subject: {subject}\nBody: {body}\n")
 
 
 def create_rule_ews(auth_config, params, token=False):
@@ -329,6 +337,7 @@ def create_rule_ews(auth_config, params, token=False):
         token =  get_ms_token(auth_config, params['auth_type'], ews_scope)
 
     # Send the EWS request with OAuth token
+    logging.info("Calling the UpdateInboxRules operation on the EWS API")
     response = requests.post(ews_url, data=soap_request, headers={
         'Content-Type': 'text/xml; charset=utf-8',
         'Authorization': f'Bearer {token}'
@@ -336,12 +345,13 @@ def create_rule_ews(auth_config, params, token=False):
 
     # Process the response
     if response.status_code == 200:
-        print("Rule created successfully.")
-        print(response.text)
+        logging.info("200 OK")
+        #print(response.text)
 
     else:
-        print(f"Failed to create rule. Status code: {response.status_code}")
-        print(response.text)
+        #print(f"Failed to create rule. Status code: {response.status_code}")
+        logging.error(f"UpdateInboxRules operation failed with status code {response.status_code}")
+        #print(response.text)
 
 def enable_email_forwarding_ews(params, token):
     
@@ -382,9 +392,10 @@ def modify_folder_permission_ews(auth_config, params, token=False):
     }
 
     # Step 1: Find the folder id
-
+    logging.info("Calling the GetFolder operation on the EWS API")
     response = requests.post(ews_url, headers = headers, data=find_item_body)
     if response.status_code == 200:
+        logging.info("200 - OK")
         root = ET.fromstring(response.text)
         
         namespaces = {
@@ -398,24 +409,24 @@ def modify_folder_permission_ews(auth_config, params, token=False):
         if folder_id_element is not None:
             folder_id = folder_id_element.attrib.get('Id')
         else:
-            print("Folder ID not found in the response.")
+            logging.error("Folder ID not found in the response.")
 
     else:
-        print(f"Failed to create rule. Status code: {response.status_code}")
-        print(response.text)
+        logging.error(f"GetFolder operation failed with status code {response.status_code }")
+        #print(response.text)
 
 
     # Step 2: Update foler permission
         
     update_folder_body = modify_folder_permissions_soap_request(params['mailbox'], folder_id, params['grantee'], params['access_rights'])
-
+    logging.info("Calling the UpdateFolder operation on the EWS API")
     response = requests.post(ews_url, headers = headers, data=update_folder_body)
 
     # Process the response
     if response.status_code == 200:
-        print("Rule created successfully.")
-        print(response.text)
+        logging.info("200 - OK")
+        #print(response.text)
 
     else:
-        print(f"Failed to create rule. Status code: {response.status_code}")
+        logging.error(f"UpdateFolder operation failed with status code {response.status_code }")
         print(response.text)
