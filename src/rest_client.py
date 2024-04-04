@@ -35,19 +35,19 @@ def enable_email_forwarding_rest(auth_config, params, token=False):
             }
         }
     }
-    
+    logging.info("Calling the Set-Mailbox operation on the REST API")
     response = requests.post(rest_endpoint, headers=headers, json=data)
 
-    if response.status_code == 201:
-        print ('Created!')
-        print(f'Error: {response.status_code}')
-        print (response.text)    
+    if response.status_code == 200:
+        logging.info("200 - OK")
+        #print(f'Error: {response.status_code}')
+        #print (response.text)    
 
     else:
-        print(f'Error: {response.status_code}')
-        print (response.text)    
+        #print(f'Error: {response.status_code}')
+        logging.error(f"Set-Mailbox operation failed with status code {response.status_code }")
+        #print (response.text)    
     
-
 
 def create_rule_rest(auth_config, params, token=False):
 
@@ -75,23 +75,26 @@ def create_rule_rest(auth_config, params, token=False):
             }
         }
     }
-
+    logging.info("Calling the New-InboxRule operation on the REST API")
     response = requests.post(rest_endpoint, headers=headers, json=data)
 
-    if response.status_code == 201:
-        print ('Created!')
-        print(f'Error: {response.status_code}')
-        print (response.text)    
+    if response.status_code == 200:
+        logging.info("200 - OK")
+        #print ('Created!')
+        #print(f'Error: {response.status_code}')
+        #print (response.text)    
 
     else:
-        print(f'Error: {response.status_code}')
-        print (response.text)    
+        logging.error(f"New-InboxRule operation failed with status code {response.status_code }")
+        #print(f'Error: {response.status_code}')
+        #print (response.text)    
     
 
 def modify_folder_permission_rest(auth_config, params, token=False):
 
-    tenant_id = auth_config['tenant_id']
+    logging.info("Running the add_folder_permission technique using the REST API")
 
+    tenant_id = auth_config['tenant_id']
     rest_endpoint = f'https://outlook.office365.com/adminapi/beta/{tenant_id}/InvokeCommand'
 
     if params['grantee'].lower() in ['default', 'anonymous']:
@@ -117,17 +120,19 @@ def modify_folder_permission_rest(auth_config, params, token=False):
             }
         }
     }
-    
+    logging.info(f"Calling the {command} operation on the REST API")
     response = requests.post(rest_endpoint, headers=headers, json=data)
 
-    if response.status_code == 201:
-        print ('Created!')
-        print(f'Error: {response.status_code}')
-        print (response.text)    
+    if response.status_code == 200:
+        logging.info("200 - OK")
+        #print ('Created!')
+        #print(f'Error: {response.status_code}')
+        #print (response.text)    
 
     else:
-        print(f'Error: {response.status_code}')
-        print (response.text)    
+        logging.error(f"{command} operation failed with status code {response.status_code }")
+        #print(f'Error: {response.status_code}')
+        #print (response.text)    
     
 def add_mailbox_delegation_rest(auth_config, params):
 
@@ -160,16 +165,19 @@ def add_mailbox_delegation_rest(auth_config, params):
             }
         }
     }
+    logging.info(f"Calling the Add-MailboxPermission operation on the REST API")
     response = requests.post(rest_endpoint, headers=headers, json=data)
 
-    if response.status_code == 201:
-        print ('Created!')
-        print(f'Error: {response.status_code}')
-        print (response.text)    
+    if response.status_code == 200:
+        logging.info("200 - OK")
+        #print ('Created!')
+        #print(f'Error: {response.status_code}')
+        #print (response.text)    
 
     else:
-        print(f'Error: {response.status_code}')
-        print (response.text)    
+        logging.error(f"Add-MailboxPermission operation failed with status code {response.status_code }")
+        #print(f'Error: {response.status_code}')
+        #print (response.text)    
 
 
 def run_compliance_search_rest(auth_config, params):
@@ -205,16 +213,19 @@ def run_compliance_search_rest(auth_config, params):
             }
         }
     }
+    logging.info(f"Calling the New-ComplianceSearch operation on the REST API")
     response = requests.post(rest_endpoint, headers=headers, json=data)
 
-    if response.status_code == 201:
-        print ('Created!')
-        print(f'Error: {response.status_code}')
-        print (response.text)    
+    if response.status_code == 200:
+        logging.info("200 - OK")
+        #print ('Created!')
+        #print(f'Error: {response.status_code}')
+        #print (response.text)    
 
     else:
-        print(f'Error: {response.status_code}')
-        print (response.text)    
+        logging.error(f"New-ComplianceSearch operation failed with status code {response.status_code }")
+        #print(f'Error: {response.status_code}')
+        #print (response.text)    
 
     data = {
     "CmdletInput": {
@@ -224,13 +235,16 @@ def run_compliance_search_rest(auth_config, params):
             }
         }
     }        
+    logging.info(f"Calling the Start-ComplianceSearch operation on the REST API")
     response = requests.post(rest_endpoint, headers=headers, json=data)
 
-    if response.status_code == 201:
-        print ('Created!')
-        print(f'Error: {response.status_code}')
-        print (response.text)    
+    if response.status_code == 200:
+        logging.info("200 - OK")
+        #print ('Created!')
+        #print(f'Error: {response.status_code}')
+        #print (response.text)    
 
     else:
-        print(f'Error: {response.status_code}')
-        print (response.text)   
+        logging.error(f"New-ComplianceSearch operation failed with status code {response.status_code }")
+        #print(f'Error: {response.status_code}')
+        #print (response.text)   
