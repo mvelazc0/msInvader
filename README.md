@@ -1,8 +1,10 @@
 # msInvader
 
-![msInvader Logo](img/msInvader.png)
-
-
+<div align="center">
+    <img src="img/msInvader.png" alt="msInvader logo">
+</div>
+<br>
+<br>
 msInvader is an adversary simulation tool built for blue teams, designed to simulate adversary techniques within M365 and Azure environments. Its purpose is to generate attack telemetry that aids teams in building, testing, and enhancing detection analytics.
 
 To facilitate realistic simulations, msInvader implements multiple authentication mechanisms that mirror different attack scenarios. It supports two OAuth flows for simulating a compromised user scenario: the resource owner password flow and the device authorization flow. These methods allow msInvader to obtain tokens simulating the compromise of a user's credentials or an successful adversary in the middle (AiTM) attack . Additionally, msInvader can replicate conditions involving compromised service principals by supporting the client credentials OAuth flow.
