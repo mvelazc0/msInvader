@@ -35,3 +35,4 @@ python msInvader.py -c config.yaml
 ## References
 
 * [ROADtools](https://github.com/dirkjanm/ROADtools) by [Dirk-jan]([https://twitter.com/Cyb3rWard0g](https://twitter.com/_dirkjan))
+* [GraphRunner](https://github.com/dafthack/GraphRunner) by [Beau Bullock](https://twitter.com/dafthack)
