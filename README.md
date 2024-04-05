@@ -4,9 +4,8 @@
     <img src="img/msInvader.png" alt="msInvader logo">
 </div>
 <br>
-msInvader is an adversary simulation tool built for blue teams, designed to simulate adversary techniques within M365 and Azure environments. Its purpose is to generate attack telemetry that aids teams in building, testing, and enhancing detection analytics. 
-<br>
-To facilitate realistic simulations, msInvader implements multiple authentication mechanisms that mirror different attack scenarios. It supports two OAuth flows for simulating a compromised user scenario: the resource owner password flow and the device authorization flow. These methods allow msInvader to obtain tokens simulating the compromise of a user's credentials or an successful adversary in the middle (AiTM) attack . Additionally, msInvader can replicate conditions involving compromised service principals by supporting the client credentials OAuth flow.
+msInvader is an adversary simulation tool built for blue teams, designed to simulate adversary techniques within M365 and Azure environments. Its purpose is to generate attack telemetry that aids teams in building, testing, and enhancing detection analytics. <br> <br>
+To facilitate realistic simulations, msInvader implements multiple authentication mechanisms that mirror different attack scenarios. It supports two OAuth flows for simulating a compromised user scenario: the resource owner password flow and the device authorization flow. These methods allow msInvader to obtain tokens simulating the compromise of a user's credentials or an successful adversary in the middle (AiTM) attack . Additionally, msInvader can replicate conditions involving compromised service principals by supporting the client credentials OAuth flow.<br><br>
 
 Once authenticated, msInvader is capable of interacting with Exchange Online through three distinct methods: the Graph API, Exchange Web Services (EWS), and the REST API utilized by the Exchange Online PowerShell module. This support enables msInvader to comprehensively simulate attack techniques, providing blue teams with the flexibility to simulate multiple scenarios. 
 
