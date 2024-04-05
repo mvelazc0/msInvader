@@ -1,3 +1,38 @@
 # msInvader
 
-msInvader is an open-source tool designed to enhance security defenses within Microsoft 365 (M365) and Azure environments. Its primary goal is to empower blue teams by enabling the simulation of a broad range of attack techniques against M365 and Azure services. By leveraging Microsoft interfaces such as EWS, Graph API, and REST APIs, msInvader offers a versatile platform for simulating attacks, helping security teams to build, test, and refine detection strategies.
+msInvader is an adversary simulation tool built for blue teams, designed to simulate adversary techniques within M365 and Azure environments. Its purpose is to generate attack telemetry that aids teams in building, testing, and enhancing detection analytics.
+
+To facilitate realistic simulations, msInvader implements multiple authentication mechanisms that mirror different attack scenarios. It supports two OAuth flows for simulating a compromised user scenario: the resource owner password flow and the device authorization flow. These methods allow msInvader to obtain tokens simulating the compromise of a user's credentials or an successful adversary in the middle (AiTM) attack . Additionally, msInvader can replicate conditions involving compromised service principals by supporting the client credentials OAuth flow.
+
+Once authenticated, msInvader is capable of interacting with Exchange Online through three distinct methods: the Graph API, Exchange Web Services (EWS), and the REST API utilized by the Exchange Online PowerShell module. This support enables msInvader to comprehensively simulate attack techniques, providing blue teams with the flexibility to simulate multiple scenarios. 
+
+## Quick Start Guide
+
+### Clone Repository 
+
+````
+git clone https://github.com/yourusername/msInvader.git
+````
+
+
+### Configuration
+
+1. Open the `config.yaml` file located in the msInvader directory.
+2. Configure the `authentication` section with your Azure/M365 credentials. Refer to the [Authentication Section](#authentication-section) guide for details.
+3. Enable and configure the desired techniques in the `techniques` section. Each technique requires specific parameters, which are detailed in the [Supported Techniques](#supported-techniques) documentation.
+
+## Step 3: Running msInvader
+
+To run msInvader with your configuration file:
+
+````
+python msInvader.py -c config.yaml
+````
+
+## Author
+
+* **Mauricio Velazco** - [@mvelazco](https://twitter.com/mvelazco)
+
+## References
+
+* [ROADtools](https://github.com/dirkjanm/ROADtools) by [Dirk-jan]([https://twitter.com/Cyb3rWard0g](https://twitter.com/_dirkjan))
