@@ -36,3 +36,7 @@ python msInvader.py -c config.yaml
 
 * [ROADtools](https://github.com/dirkjanm/ROADtools) by [Dirk-jan Molleme](https://twitter.com/_dirkjan)
 * [GraphRunner](https://github.com/dafthack/GraphRunner) by [Beau Bullock](https://twitter.com/dafthack)
+
+## License
+
+This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details
