@@ -1,6 +1,6 @@
 # msInvader
 
-![msInvader Logo](img/msInvader.png){:width="200px"}
+![msInvader Logo](img/msInvader.png)
 
 
 msInvader is an adversary simulation tool built for blue teams, designed to simulate adversary techniques within M365 and Azure environments. Its purpose is to generate attack telemetry that aids teams in building, testing, and enhancing detection analytics.
