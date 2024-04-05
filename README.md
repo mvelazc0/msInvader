@@ -11,7 +11,7 @@ Once authenticated, msInvader is capable of interacting with Exchange Online thr
 ### Step 1 : Clone repository 
 
 ````
-git clone https://github.com/yourusername/msInvader.git
+git clone https://github.com/mvelazc0/msInvader.git
 ````
 
 ### Step 2: Customize configuration file
