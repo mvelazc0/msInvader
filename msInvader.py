@@ -148,7 +148,11 @@ def main():
 
                 run_compliance_search_rest(config['authentication'], technique['parameters'])      
 
+        elif technique['technique'] == 'create_mailfow_rule':
 
+            if technique['parameters']['method'] == 'rest':
+
+                create_mailfow_rule_rest(config['authentication'], technique['parameters'])      
 
 if __name__ == "__main__":
     main()

