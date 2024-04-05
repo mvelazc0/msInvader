@@ -18,7 +18,7 @@ git clone https://github.com/yourusername/msInvader.git
 ### Configuration
 
 1. Open the `config.yaml` file located in the msInvader directory.
-2. Configure the `authentication` section with your Azure/M365 credentials. Refer to the [Authentication Section](msInvader-Configuration-File) guide for details.
+2. Configure the `authentication` section with your Azure/M365 credentials. Refer to the [Authentication Section](../../wiki/msInvader-Configuration-File) guide for details.
 3. Enable and configure the desired techniques in the `techniques` section. Each technique requires specific parameters, which are detailed in the [Supported Techniques](#supported-techniques) documentation.
 
 ## Step 3: Running msInvader
