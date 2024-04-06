@@ -9,6 +9,10 @@ To facilitate realistic simulations, msInvader implements multiple authenticatio
 
 Once authenticated, msInvader is capable of interacting with Exchange Online through three distinct methods: the Graph API, Exchange Web Services (EWS), and the REST API utilized by the Exchange Online PowerShell module. This support enables msInvader to comprehensively simulate attack techniques, providing blue teams with the flexibility to simulate multiple scenarios. 
 
+## Documentation
+
+Visit the [Wiki](https://github.com/mvelazc0/msInvader/wiki/) for documentation.
+
 ## Quick Start Guide
 
 ### Step 1 : Clone repository 
