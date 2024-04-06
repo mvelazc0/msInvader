@@ -6,11 +6,12 @@ from src.auth import get_ms_token
 
 graph_scope = "https://graph.microsoft.com/.default"
 
-def read_email_graph(auth_config, params):
+def read_email_graph(auth_config, params, token=False):
 
     logging.info("Running the read_email technique using the Graph API")
 
-    token = get_ms_token(auth_config, params['auth_type'], graph_scope)
+    if not token:
+        token = get_ms_token(auth_config, params['auth_type'], graph_scope)
 
     mailbox = params['mailbox']
     graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/Inbox/messages'
@@ -36,7 +37,7 @@ def read_email_graph(auth_config, params):
         logging.error(f"Operation failed with status code {response.status_code }")
         #print (response.text)
 
-def create_rule_graph(auth_config, params):
+def create_rule_graph(auth_config, params, token=False):
 
     logging.info("Running the create_rule technique using the Graph API")
 
@@ -52,7 +53,8 @@ def create_rule_graph(auth_config, params):
     graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/Inbox/messageRules'
     #graph_endpoint = f'https://graph.microsoft.com/v1.0/users/me/mailFolders/Inbox/messageRules'
 
-    token = get_ms_token(auth_config, params['auth_type'], graph_scope)
+    if not token:
+        token = get_ms_token(auth_config, params['auth_type'], graph_scope)
 
     headers = {
         'Authorization': f'Bearer {token}',

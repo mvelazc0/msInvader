@@ -50,8 +50,8 @@ def get_ms_token_username_pass(tenant_id, username, password, scope):
     if token:
         return token
     else:
-        print ('Error obtaining token')
-        print (response.text)
+        logging.error (f'Error obtaining token. Http response: {response.status_code}')
+        #print (response.text)
 
 
 def get_device_code(tenant_id, client_id, scope):
@@ -98,7 +98,6 @@ def get_ms_token_device_code(tenant_id, scope):
             if token_response["error"] == "authorization_pending":
                 print("Authorization pending. Please complete the user authentication.")
             elif token_response["error"] == "slow_down":
-                print("Slow down your polling rate.")
                 time.sleep(5)  
             else:
                 print("Error:", token_response["error_description"])

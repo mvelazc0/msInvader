@@ -75,7 +75,7 @@ def main():
     setup_logging(logging.INFO)
     print (banner)
 
-    parser = argparse.ArgumentParser(description='msInvader - M365 Adersary Simulation - https://github.com/mvelazc0/msInvader')
+    parser = argparse.ArgumentParser(description='msInvader - M365/Azure Adversary Simulation - https://github.com/mvelazc0/msInvader')
 
     parser.add_argument('-c', dest='config', type=str, help='Configuration file')
     args = parser.parse_args()
@@ -91,7 +91,7 @@ def main():
     logging.info("Starting technique execution")
 
     for technique in enabled_techniques:
-
+        
         if technique['technique'] == 'read_email':
 
             if technique['parameters']['method'] == 'graph':

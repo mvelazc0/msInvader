@@ -260,11 +260,12 @@ def modify_folder_permissions_soap_request(mailbox, folder_id, grantee, access_r
 
 ## Functions to execute techniques
 
-def read_email_ews(auth_config, params):
+def read_email_ews(auth_config, params, token=False):
 
     logging.info("Running the read_email technique using the EWS API")
 
-    token = get_ms_token(auth_config, params['auth_type'], ews_scope)
+    if not token:
+        token = get_ms_token(auth_config, params['auth_type'], ews_scope)
 
     mailbox= params['mailbox']
 
@@ -353,6 +354,7 @@ def create_rule_ews(auth_config, params, token=False):
         logging.error(f"UpdateInboxRules operation failed with status code {response.status_code}")
         #print(response.text)
 
+"""
 def enable_email_forwarding_ews(params, token):
     
     logging.info("Running the enable_email_forwarding technique using the EWS API")
@@ -376,6 +378,7 @@ def enable_email_forwarding_ews(params, token):
     else:
         print(f"Failed to create rule. Status code: {response.status_code}")
         print(response.text)
+"""    
 
 def modify_folder_permission_ews(auth_config, params, token=False):
 

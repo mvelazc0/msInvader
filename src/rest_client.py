@@ -5,7 +5,7 @@ import logging
 
 rest_scope   = "https://outlook.office365.com/.default"
 
-security_compliance_scope = "https://nam11b.ps.compliance.protection.outlook.com/.default"
+#security_compliance_scope = "https://nam11b.ps.compliance.protection.outlook.com/.default"
 
 
 def enable_email_forwarding_rest(auth_config, params, token=False):
@@ -134,7 +134,7 @@ def modify_folder_permission_rest(auth_config, params, token=False):
         #print(f'Error: {response.status_code}')
         #print (response.text)    
     
-def add_mailbox_delegation_rest(auth_config, params):
+def add_mailbox_delegation_rest(auth_config, params, token=False):
 
     # https://learn.microsoft.com/en-us/exchange/recipients/mailbox-permissions?view=exchserver-2019
     # https://learn.microsoft.com/en-us/powershell/module/exchange/add-mailboxpermission?view=exchange-ps
@@ -146,9 +146,8 @@ def add_mailbox_delegation_rest(auth_config, params):
 
     rest_endpoint = f'https://outlook.office365.com/adminapi/beta/{tenant_id}/InvokeCommand'
 
-
-    token = get_ms_token(auth_config, params['auth_type'], rest_scope)
-
+    if not token:
+        token = get_ms_token(auth_config, params['auth_type'], rest_scope)
 
     headers = {
         'Authorization': f'Bearer {token}',
@@ -180,7 +179,7 @@ def add_mailbox_delegation_rest(auth_config, params):
         #print (response.text)    
 
 
-def run_compliance_search_rest(auth_config, params):
+def run_compliance_search_rest(auth_config, params, token=False):
 
     # https://learn.microsoft.com/en-us/exchange/recipients/mailbox-permissions?view=exchserver-2019
     # https://learn.microsoft.com/en-us/powershell/module/exchange/add-mailboxpermission?view=exchange-ps
@@ -194,7 +193,8 @@ def run_compliance_search_rest(auth_config, params):
     rest_endpoint = f'https://nam11b.ps.compliance.protection.outlook.com/adminapi/beta/{tenant_id}/InvokeCommand'
 
     #token = get_ms_token(auth_config, params['auth_type'], security_compliance_scope)
-    token = get_ms_token(auth_config, params['auth_type'], rest_scope)
+    if not token:
+        token = get_ms_token(auth_config, params['auth_type'], rest_scope)
 
     #{"CmdletInput":{"CmdletName":"New-ComplianceSearch","Parameters":{"ContentMatchQuery":"password","ExchangeLocation":["All"],"Name":"pws3 Search"}}}
 
@@ -250,16 +250,15 @@ def run_compliance_search_rest(auth_config, params):
         #print (response.text)   
 
 
-def create_mailfow_rule_rest(auth_config, params):
+def create_mailfow_rule_rest(auth_config, params, token=False):
 
     logging.info("Running the create_mailfow_rule technique using the REST API")
     tenant_id = auth_config['tenant_id']
 
     rest_endpoint = f'https://outlook.office365.com/adminapi/beta/{tenant_id}/InvokeCommand'
 
-
-    token = get_ms_token(auth_config, params['auth_type'], rest_scope)
-
+    if not token:
+        token = get_ms_token(auth_config, params['auth_type'], rest_scope)
 
     headers = {
         'Authorization': f'Bearer {token}',
