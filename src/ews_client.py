@@ -265,7 +265,7 @@ def read_email_ews(auth_config, params, token=False):
     logging.info("Running the read_email technique using the EWS API")
 
     if not token:
-        token = get_ms_token(auth_config, params['auth_type'], ews_scope)
+        token = get_ms_token(auth_config, params['auth_method'], ews_scope)
 
     mailbox= params['mailbox']
 
@@ -278,7 +278,7 @@ def read_email_ews(auth_config, params, token=False):
     # Step 1: FindItem request to get email IDs
 
     # Check if we need exchange impersonation headers
-    if params['auth_type'] == 3:
+    if params['auth_method'] == 3:
         find_item_request = create_find_item_soap_request(mailbox, True)
 
     else:
@@ -305,7 +305,7 @@ def read_email_ews(auth_config, params, token=False):
     for item_id in item_ids[:params['limit']]:
 
         # Check if we need exchange impersonation headers
-        if params['auth_type'] == 3:
+        if params['auth_method'] == 3:
             get_item_request = create_get_item_soap_request(item_id, mailbox, True)
 
         else:
@@ -335,7 +335,7 @@ def create_rule_ews(auth_config, params, token=False):
     soap_request = create_forwarding_rule_soap_request(mailbox, forward_to, rule_name, body_contains)
 
     if not token:
-        token =  get_ms_token(auth_config, params['auth_type'], ews_scope)
+        token =  get_ms_token(auth_config, params['auth_method'], ews_scope)
 
     # Send the EWS request with OAuth token
     logging.info("Calling the UpdateInboxRules operation on the EWS API")
@@ -386,7 +386,8 @@ def modify_folder_permission_ews(auth_config, params, token=False):
 
     find_item_body = create_find_folder_soap_request(params['mailbox'], params['folder'])
 
-    token = get_ms_token(auth_config, params['auth_type'], ews_scope)
+    if not token:
+        token = get_ms_token(auth_config, params['auth_method'], ews_scope)
 
     # Headers
     headers = {

@@ -27,6 +27,8 @@ def get_ms_token_username_pass(tenant_id, username, password, scope):
 
     token_url = f'https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token'
 
+    full_scope = f'{scope} offline_access'
+
     token_data = {
 
         #'client_id': '1950a258-227b-4e31-a9cf-717495945fc2', # Microsoft Azure PowerShell
@@ -42,10 +44,11 @@ def get_ms_token_username_pass(tenant_id, username, password, scope):
         'grant_type': 'password',
         'username': username,
         'password': password,
-        'scope': scope
+        'scope': full_scope
     }
 
     response = requests.post(token_url, data=token_data)
+    #print(response.text)
     token = response.json().get('access_token')
     if token:
         return token
@@ -107,11 +110,11 @@ def get_ms_token_device_code(tenant_id, scope):
     
 
 
-def get_ms_token(auth_config, auth_type, scope):
+def get_ms_token(auth_config, auth_method, scope):
     
-    if auth_type == 1:
+    if auth_method == 'resource_owner':
         return get_ms_token_username_pass(auth_config['tenant_id'], auth_config['username'], auth_config['password'], scope)
-    elif auth_type == 2:
+    elif auth_method == 'device_code':
         return get_ms_token_device_code(auth_config['tenant_id'], scope)
-    elif auth_type == 3:
+    elif auth_method == 'client_credential':
         return get_ms_token_client(auth_config['tenant_id'], auth_config['application_id'], auth_config['client_secret'], scope)

