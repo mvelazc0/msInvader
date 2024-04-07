@@ -104,7 +104,7 @@ def main():
 
             elif method == 'graph':
                 graph_token= get_ms_token(config['authentication'], config['authentication']['auth_method'], graph_scope)
-
+                #ews_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], ews_scope)
 
     logging.info(f"Identified {len(enabled_techniques)} enabled technique(s) on configuration file")
     logging.info("Starting technique execution")
@@ -112,11 +112,17 @@ def main():
     
     for technique in enabled_techniques:
 
+        if technique['technique'] == 'search_mailbox':
+
+            if technique['parameters']['method'] == 'graph':
+
+                search_mailbox_graph(config['authentication'], technique['parameters'], graph_token['access_token'])
+
         if technique['technique'] == 'read_email':
 
             if technique['parameters']['method'] == 'graph':
 
-                read_email_graph(config['authentication'], technique['parameters'], graph_token)
+                read_email_graph(config['authentication'], technique['parameters'], graph_token['access_token'])
 
             elif technique['parameters']['method'] == 'ews':
 
@@ -130,7 +136,7 @@ def main():
 
             if technique['parameters']['method'] == 'graph':
 
-                create_rule_graph(config['authentication'], technique['parameters'], graph_token)
+                create_rule_graph(config['authentication'], technique['parameters'], graph_token['acesss_token'])
 
             elif technique['parameters']['method'] == 'ews':
 

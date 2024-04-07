@@ -37,6 +37,58 @@ def read_email_graph(auth_config, params, token=False):
         logging.error(f"Operation failed with status code {response.status_code }")
         #print (response.text)
 
+
+def search_mailbox_graph(auth_config, params, token=False):
+
+    logging.info("Running the search_mailbox technique using the Graph API")
+
+    if not token:
+        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
+
+    graph_endpoint = f'https://graph.microsoft.com/v1.0/search/query'
+
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+
+    keyword = params['keyword']
+    limit = params ['limit']
+
+    data = {
+        "requests": [
+            {
+            "entityTypes": [
+                "message"
+            ],
+            "query": {
+                "queryString": keyword
+            },
+            "from": 0,
+            "size": limit
+            }
+        ]
+    }
+
+    short_endpoint = graph_endpoint.replace("https://graph.microsoft.com","")
+    logging.info(f"Submitting POST request to {short_endpoint}")
+    response = requests.post(graph_endpoint, headers=headers, json=data)
+
+    if response.status_code == 200:
+        logging.info("200 OK")
+        values = response.json().get('value', [])
+        for value in values:
+            for hitsContainer in value["hitsContainers"]:
+                for hit in hitsContainer["hits"]:
+                    subject = hit["resource"]["subject"]
+                    logging.info(f"Found email with subject: {subject}")
+        #print (hits[0])
+        #print (response.text)
+    else:
+        logging.error(f"Operation failed with status code {response.status_code }")
+        print (response.text)
+
+
 def create_rule_graph(auth_config, params, token=False):
 
     logging.info("Running the create_rule technique using the Graph API")

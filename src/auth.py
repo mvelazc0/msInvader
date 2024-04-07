@@ -15,8 +15,17 @@ def get_ms_token_client(tenant_id, client_id, client_secret, scope):
         'scope': scope
     }
 
-    token_r = requests.post(token_url, data=token_data)
-    return token_r.json().get('access_token')
+    response = requests.post(token_url, data=token_data)
+
+    refresh_token = response.json().get('access_token')
+    access_token = response.json().get('access_token')
+
+    if refresh_token and access_token:
+        return {'access_token': access_token, 'refresh_token': refresh_token}
+    else:
+        logging.error (f'Error obtaining token. Http response: {response.status_code}')
+        #print (response.text)
+
 
 
 def get_ms_token_username_pass(tenant_id, username, password, scope):
@@ -49,12 +58,14 @@ def get_ms_token_username_pass(tenant_id, username, password, scope):
 
     response = requests.post(token_url, data=token_data)
     #print(response.text)
-    token = response.json().get('access_token')
-    if token:
-        return token
+    refresh_token = response.json().get('access_token')
+    access_token = response.json().get('access_token')
+
+    if refresh_token and access_token:
+        return {'access_token': access_token, 'refresh_token': refresh_token}
     else:
         logging.error (f'Error obtaining token. Http response: {response.status_code}')
-        #print (response.text)
+        print (response.text)
 
 
 def get_device_code(tenant_id, client_id, scope):
@@ -108,6 +119,36 @@ def get_ms_token_device_code(tenant_id, scope):
         else:
             return token_response.get('access_token')
     
+
+def get_new_token_with_refresh_token(tenant_id, refresh_token, new_scope):
+
+    logging.info("Using refresh token to obtain a new access token for a different scope")
+
+    token_url = f'https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token'
+    client_id = '00b41c95-dab0-4487-9791-b9d2c32c80f2' # Office 365 Management. Works to read emails Graph and EWS.
+
+
+    # Note: Including 'offline_access' in the new scope ensures you get a new refresh token
+    full_scope = f'{new_scope} offline_access'
+
+    token_data = {
+        'client_id': client_id,
+        'grant_type': 'refresh_token',
+        'refresh_token': refresh_token,
+        'scope': full_scope
+    }
+
+    response = requests.post(token_url, data=token_data)
+    print(response.text)
+    response_json = response.json()
+
+    new_access_token = response_json.get('access_token')
+    new_refresh_token = response_json.get('refresh_token') 
+
+    if new_access_token:
+        return {'access_token': new_access_token, 'refresh_token': new_refresh_token}
+    else:
+        logging.error(f'Error obtaining new access token. HTTP response: {response.status_code}')
 
 
 def get_ms_token(auth_config, auth_method, scope):
