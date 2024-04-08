@@ -13,6 +13,23 @@ Once authenticated, msInvader is capable of interacting with Exchange Online thr
 
 Visit the [Wiki](https://github.com/mvelazc0/msInvader/wiki/) for documentation.
 
+## Suppoted Techniques
+
+| Technique                | Graph | EWS | REST |
+|--------------------------|:-----:|:---:|:----:|
+| read_email               | X     | X   |      |
+| search_mailbox           | X     |     |      |
+| search_onedrive          | X     |     |      |
+| create_rule              | X     | X   | X    |
+| enable_email_forwarding  |       |     | X    |
+| add_folder_permission    |       | X   | X    |
+| add_mailbox_delegation   |       |     | X    |
+| run_compliance_search    |       | X   |      |
+| create_mailflow          |       |     | X    |
+
+Visit [Supported Techniques](https://github.com/mvelazc0/msInvader/wiki/Supported-Techniques) on to Wiki for technique descriptions. .
+
+
 ## Quick Start Guide
 
 ### Step 1 : Clone repository 
