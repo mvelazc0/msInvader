@@ -32,7 +32,7 @@ Visit the [Wiki](https://github.com/mvelazc0/msInvader/wiki/) for documentation.
 </div>
 
 
-Visit [Supported Techniques](https://github.com/mvelazc0/msInvader/wiki/Supported-Techniques) on to Wiki for technique descriptions. .
+Visit [Supported Techniques](https://github.com/mvelazc0/msInvader/wiki/Supported-Techniques) on the Wiki for technique descriptions.
 
 
 ## Quick Start Guide
