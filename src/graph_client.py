@@ -74,16 +74,86 @@ def search_mailbox_graph(auth_config, params, token=False):
     logging.info(f"Submitting POST request to {short_endpoint}")
     response = requests.post(graph_endpoint, headers=headers, json=data)
 
+    hits_found = False
+
     if response.status_code == 200:
         logging.info("200 OK")
         values = response.json().get('value', [])
         for value in values:
-            for hitsContainer in value["hitsContainers"]:
-                for hit in hitsContainer["hits"]:
+            for hitsContainer in value.get("hitsContainers", []):
+                for hit in hitsContainer.get("hits", []):
+                    hits_found = True
                     subject = hit["resource"]["subject"]
                     logging.info(f"Found email with subject: {subject}")
         #print (hits[0])
         #print (response.text)
+
+        if not hits_found:
+            logging.info("Request returned 0 results.")
+    else:
+        logging.error(f"Operation failed with status code {response.status_code }")
+        print (response.text)
+
+
+
+def search_onedrive_graph(auth_config, params, token=False):
+
+    logging.info("Running the search_onedrive technique using the Graph API")
+
+    if not token:
+        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
+
+    graph_endpoint = f'https://graph.microsoft.com/v1.0/search/query'
+
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+
+    keyword = params['keyword']
+    limit = params ['limit']
+
+    data = {
+        "requests": [
+            {
+            "entityTypes": [
+                "driveItem"
+            ],
+            "query": {
+                "queryString": keyword
+            },
+            "from": 0,
+            "size": limit
+            }
+        ]
+    }
+
+    short_endpoint = graph_endpoint.replace("https://graph.microsoft.com","")
+    logging.info(f"Submitting POST request to {short_endpoint}")
+    response = requests.post(graph_endpoint, headers=headers, json=data)
+
+    hits_found = False
+
+
+    if response.status_code == 200:
+        logging.info("200 OK")
+        #print (response.text)
+        values = response.json().get('value', [])
+        for value in values:
+            for hitsContainer in value.get("hitsContainers", []):
+                for hit in hitsContainer.get("hits", []):
+                    #print (hit['resource'].keys())
+                    hits_found = True
+                    name = hit['resource']['name']
+                    created = hit['resource']['createdDateTime']
+                    logging.info(f"Found file name: {name} created at {created}")
+
+        if not hits_found:
+            logging.info("Requested returned 0 results.")
+        #print (hits[0])
+        #print (response.text)
+
+
     else:
         logging.error(f"Operation failed with status code {response.status_code }")
         print (response.text)

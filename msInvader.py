@@ -93,8 +93,11 @@ def main():
     ews_token = False
     graph_token = False
 
+    logging.info(f"Identified {len(enabled_techniques)} enabled technique(s) on configuration file")
+
+
     if config['authentication']['auth_method']:
-        logging.info("Using a single token for all simulations")
+        logging.info(f"Obtaining authentication tokens required to execute simulations")
         for method in methods:
             if method == 'rest':
                 rest_token = get_ms_token(config['authentication'], config['authentication']['auth_method'], rest_scope)
@@ -106,8 +109,7 @@ def main():
                 graph_token= get_ms_token(config['authentication'], config['authentication']['auth_method'], graph_scope)
                 #ews_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], ews_scope)
 
-    logging.info(f"Identified {len(enabled_techniques)} enabled technique(s) on configuration file")
-    logging.info("Starting technique execution")
+    logging.info("************* Starting technique execution *************")
 
     
     for technique in enabled_techniques:
@@ -117,6 +119,12 @@ def main():
             if technique['parameters']['method'] == 'graph':
 
                 search_mailbox_graph(config['authentication'], technique['parameters'], graph_token['access_token'])
+
+        if technique['technique'] == 'search_onedrive':
+
+            if technique['parameters']['method'] == 'graph':
+
+                search_onedrive_graph(config['authentication'], technique['parameters'], graph_token['access_token'])
 
         if technique['technique'] == 'read_email':
 
@@ -179,6 +187,8 @@ def main():
             if technique['parameters']['method'] == 'rest':
 
                 create_mailfow_rule_rest(config['authentication'], technique['parameters'], rest_token)      
+
+    logging.info("************* Finished technique execution *************")
 
     
 
