@@ -13,7 +13,7 @@ Once authenticated, msInvader is capable of interacting with Exchange Online thr
 
 Visit the [Wiki](https://github.com/mvelazc0/msInvader/wiki/) for documentation.
 
-## Suppoted Techniques
+## Supported Techniques
 
 | Technique                | Graph | EWS | REST |
 |--------------------------|:-----:|:---:|:----:|
