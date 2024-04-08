@@ -87,7 +87,7 @@ def main():
     
     config = load_config(config_path)
     enabled_techniques = [tech for tech in config['techniques'] if tech['enabled']]
-    methods = list(set([tech['parameters']['method'] for tech in enabled_techniques]))
+    methods = list(set([tech['parameters']['access_method'] for tech in enabled_techniques]))
 
     rest_token = False
     ews_token = False
@@ -116,75 +116,75 @@ def main():
 
         if technique['technique'] == 'search_mailbox':
 
-            if technique['parameters']['method'] == 'graph':
+            if technique['parameters']['access_method'] == 'graph':
 
                 search_mailbox_graph(config['authentication'], technique['parameters'], graph_token['access_token'])
 
         if technique['technique'] == 'search_onedrive':
 
-            if technique['parameters']['method'] == 'graph':
+            if technique['parameters']['access_method'] == 'graph':
 
                 search_onedrive_graph(config['authentication'], technique['parameters'], graph_token['access_token'])
 
         if technique['technique'] == 'read_email':
 
-            if technique['parameters']['method'] == 'graph':
+            if technique['parameters']['access_method'] == 'graph':
 
                 read_email_graph(config['authentication'], technique['parameters'], graph_token['access_token'])
 
-            elif technique['parameters']['method'] == 'ews':
+            elif technique['parameters']['access_method'] == 'ews':
 
                 read_email_ews(config['authentication'], technique['parameters'], ews_token)
             
-            elif technique['parameters']['method'] == 'rest':
+            elif technique['parameters']['access_method'] == 'rest':
                 # Exchange online management does not support Get-Message on M365
                 logging.error("Technique method not supported")
 
         elif technique['technique'] == 'create_rule':
 
-            if technique['parameters']['method'] == 'graph':
+            if technique['parameters']['access_method'] == 'graph':
 
                 create_rule_graph(config['authentication'], technique['parameters'], graph_token['acesss_token'])
 
-            elif technique['parameters']['method'] == 'ews':
+            elif technique['parameters']['access_method'] == 'ews':
 
                 create_rule_ews(config['authentication'], technique['parameters'], ews_token)
 
-            elif technique['parameters']['method'] == 'rest':
+            elif technique['parameters']['access_method'] == 'rest':
 
                 create_rule_rest(config['authentication'], technique['parameters'], rest_token)
 
         elif technique['technique'] == 'enable_email_forwarding':
 
-            if technique['parameters']['method'] == 'rest':
+            if technique['parameters']['access_method'] == 'rest':
 
                 enable_email_forwarding_rest(config['authentication'], technique['parameters'], rest_token)      
 
         elif technique['technique'] == 'add_folder_permission':
 
-            if technique['parameters']['method'] == 'rest':
+            if technique['parameters']['access_method'] == 'rest':
 
                 modify_folder_permission_rest(config['authentication'], technique['parameters'], rest_token)      
 
-            if technique['parameters']['method'] == 'ews':
+            if technique['parameters']['access_method'] == 'ews':
     
                 modify_folder_permission_ews(config['authentication'], technique['parameters'], ews_token)      
 
         elif technique['technique'] == 'add_mailbox_delegation':
 
-            if technique['parameters']['method'] == 'rest':
+            if technique['parameters']['access_method'] == 'rest':
 
                 add_mailbox_delegation_rest(config['authentication'], technique['parameters'], rest_token)      
 
         elif technique['technique'] == 'run_compliance_search':
 
-            if technique['parameters']['method'] == 'rest':
+            if technique['parameters']['access_method'] == 'rest':
 
                 run_compliance_search_rest(config['authentication'], technique['parameters'], rest_token)      
 
         elif technique['technique'] == 'create_mailfow_rule':
 
-            if technique['parameters']['method'] == 'rest':
+            if technique['parameters']['access_method'] == 'rest':
 
                 create_mailfow_rule_rest(config['authentication'], technique['parameters'], rest_token)      
 

