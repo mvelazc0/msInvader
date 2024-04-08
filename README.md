@@ -15,6 +15,8 @@ Visit the [Wiki](https://github.com/mvelazc0/msInvader/wiki/) for documentation.
 
 ## Supported Techniques
 
+<div align="center">
+
 | Technique                | Graph | EWS | REST |
 |--------------------------|:-----:|:---:|:----:|
 | read_email               | X     | X   |      |
@@ -26,6 +28,9 @@ Visit the [Wiki](https://github.com/mvelazc0/msInvader/wiki/) for documentation.
 | add_mailbox_delegation   |       |     | X    |
 | run_compliance_search    |       | X   |      |
 | create_mailflow          |       |     | X    |
+
+</div>
+
 
 Visit [Supported Techniques](https://github.com/mvelazc0/msInvader/wiki/Supported-Techniques) on to Wiki for technique descriptions. .
 
