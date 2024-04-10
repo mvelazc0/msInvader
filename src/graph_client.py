@@ -24,7 +24,7 @@ def read_email_graph(auth_config, params, token=False):
     }
 
     short_endpoint = graph_endpoint.replace("https://graph.microsoft.com","")
-    logging.info(f"Submitting GET request to {short_endpoint}")
+    logging.info(f"Submitting GET request to v1.0/users/me/mailFolders/Inbox/messages")
     response = requests.get(graph_endpoint, headers=headers)
 
     if response.status_code == 200:
