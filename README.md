@@ -1,4 +1,5 @@
 # msInvader
+[![Open_Threat_Research Community](https://img.shields.io/badge/Open_Threat_Research-Community-brightgreen.svg)](https://twitter.com/OTR_Community)
 
 <div align="center">
     <img src="img/msInvader.png" alt="msInvader logo">
