@@ -32,7 +32,7 @@ Visit the [Wiki](https://github.com/mvelazc0/msInvader/wiki/) for documentation.
 | enable_email_forwarding  |       |     | X    |
 | add_folder_permission    |       | X   | X    |
 | add_mailbox_delegation   |       |     | X    |
-| run_compliance_search    |       | X   |      |
+| run_compliance_search    |       |     | X     |
 | create_mailflow          |       |     | X    |
 
 </div>
