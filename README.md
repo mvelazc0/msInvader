@@ -13,6 +13,11 @@ Once authenticated, msInvader is capable of interacting with Exchange Online thr
 
 Visit the [Wiki](https://github.com/mvelazc0/msInvader/wiki/) for documentation.
 
+## Demo
+
+[![msInvader](https://img.youtube.com/vi/a6iUrufyXRE/0.jpg)](https://www.youtube.com/watch?v=a6iUrufyXRE)
+
+
 ## Supported Techniques
 
 <div align="center">
