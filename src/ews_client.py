@@ -345,20 +345,27 @@ def create_rule_ews(auth_config, params, token=False):
 
     # Send the EWS request with OAuth token
     logging.info("Calling the UpdateInboxRules operation on the EWS API")
-    response = requests.post(ews_url, data=soap_request, headers={
-        'Content-Type': 'text/xml; charset=utf-8',
-        'Authorization': f'Bearer {token}'
-    })
+
+    access_token = token['access_token']
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "text/xml; charset=utf-8"
+    }
+
+    response = requests.post(ews_url, headers=headers, data=soap_request)
 
     # Process the response
     if response.status_code == 200:
         logging.info("200 OK")
+        logging.info(f"Created rule with name: {rule_name}")
+
         #print(response.text)
 
     else:
         #print(f"Failed to create rule. Status code: {response.status_code}")
         logging.error(f"UpdateInboxRules operation failed with status code {response.status_code}")
-        #print(response.text)
+        print(response.status_code)
+        print(response.text)
 
 """
 def enable_email_forwarding_ews(params, token):
@@ -400,10 +407,11 @@ def modify_folder_permission_ews(auth_config, params, token=False):
     if not token:
         token = get_ms_token(auth_config, params['auth_method'], ews_scope)
 
-    # Headers
+    access_token = token['access_token']
+    
     headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "text/xml; charset=utf-8",
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "text/xml; charset=utf-8"
     }
 
     # Step 1: Find the folder id
@@ -428,7 +436,7 @@ def modify_folder_permission_ews(auth_config, params, token=False):
 
     else:
         logging.error(f"GetFolder operation failed with status code {response.status_code }")
-        #print(response.text)
+        print(response.text)
 
 
     # Step 2: Update foler permission

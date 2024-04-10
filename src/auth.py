@@ -60,7 +60,7 @@ def get_ms_token_username_pass(tenant_id, username, password, scope):
     #print(response.text)
     refresh_token = response.json().get('access_token')
     access_token = response.json().get('access_token')
-
+    
     if refresh_token and access_token:
         return {'access_token': access_token, 'refresh_token': refresh_token}
     else:
