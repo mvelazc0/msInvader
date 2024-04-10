@@ -96,7 +96,7 @@ def main():
     logging.info(f"Identified {len(enabled_techniques)} enabled technique(s) on configuration file")
 
 
-    if config['authentication']['auth_method']:
+    if 'auth_method ' in config['authentication'].keys():
         logging.info(f"Obtaining authentication tokens required to execute simulations")
         for method in methods:
             if method == 'rest':

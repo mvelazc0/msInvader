@@ -41,8 +41,8 @@ def get_ms_token_username_pass(tenant_id, username, password, scope):
     token_data = {
 
         #'client_id': '1950a258-227b-4e31-a9cf-717495945fc2', # Microsoft Azure PowerShell
-        #'client_id': '00b41c95-dab0-4487-9791-b9d2c32c80f2',  # Office 365 Management. Works to read emails Graph and EWS.
-        'client_id': 'd3590ed6-52b3-4102-aeff-aad2292ab01c',  # Microsoft Office. Also works to read emails Graph and EWS.
+        'client_id': '00b41c95-dab0-4487-9791-b9d2c32c80f2',  # Office 365 Management. Works to read emails Graph and EWS.
+        #'client_id': 'd3590ed6-52b3-4102-aeff-aad2292ab01c',  # Microsoft Office. Also works to read emails Graph and EWS.
         #'client_id': '00000002-0000-0ff1-ce00-000000000000', # Office 365 Exchange Online
         #'client_id': '00000006-0000-0ff1-ce00-000000000000', # Microsoft Office 365 Portal
         #'client_id': 'fb78d390-0c51-40cd-8e17-fdbfab77341b', # Microsoft Exchange REST API Based Powershell
@@ -117,7 +117,12 @@ def get_ms_token_device_code(tenant_id, scope):
                 print("Error:", token_response["error_description"])
                 break
         else:
-            return token_response.get('access_token')
+
+
+            refresh_token = token_response.get('access_token')
+            access_token = token_response.get('access_token')
+            return {'access_token': access_token, 'refresh_token': refresh_token}
+            #return token_response.get('access_token')
     
 
 def get_new_token_with_refresh_token(tenant_id, refresh_token, new_scope):

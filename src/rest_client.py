@@ -20,8 +20,9 @@ def enable_email_forwarding_rest(auth_config, params, token=False):
     if not token:
         token =  get_ms_token(auth_config, params['auth_method'], rest_scope)
 
+    access_token = token['access_token']
     headers = {
-        'Authorization': f'Bearer {token}',
+        'Authorization': f'Bearer {access_token}',
         'Content-Type': 'application/json'
     }
 
@@ -60,8 +61,9 @@ def create_rule_rest(auth_config, params, token=False):
     if not token:
         token = get_ms_token(auth_config, params['auth_method'], rest_scope)
 
+    access_token = token['access_token']
     headers = {
-        'Authorization': f'Bearer {token}',
+        'Authorization': f'Bearer {access_token}',
         'Content-Type': 'application/json'
     }
 
@@ -105,8 +107,9 @@ def modify_folder_permission_rest(auth_config, params, token=False):
     if not token:
         token = get_ms_token(auth_config, params['auth_method'], rest_scope)
 
+    access_token = token['access_token']
     headers = {
-        'Authorization': f'Bearer {token}',
+        'Authorization': f'Bearer {access_token}',
         'Content-Type': 'application/json'
     }
 
@@ -149,8 +152,9 @@ def add_mailbox_delegation_rest(auth_config, params, token=False):
     if not token:
         token = get_ms_token(auth_config, params['auth_method'], rest_scope)
 
+    access_token = token['access_token']
     headers = {
-        'Authorization': f'Bearer {token}',
+        'Authorization': f'Bearer {access_token}',
         'Content-Type': 'application/json'
     }
 
@@ -196,10 +200,9 @@ def run_compliance_search_rest(auth_config, params, token=False):
     if not token:
         token = get_ms_token(auth_config, params['auth_method'], rest_scope)
 
-    #{"CmdletInput":{"CmdletName":"New-ComplianceSearch","Parameters":{"ContentMatchQuery":"password","ExchangeLocation":["All"],"Name":"pws3 Search"}}}
-
+    access_token = token['access_token']
     headers = {
-        'Authorization': f'Bearer {token}',
+        'Authorization': f'Bearer {access_token}',
         'Content-Type': 'application/json'
     }
 
@@ -260,8 +263,10 @@ def create_mailfow_rule_rest(auth_config, params, token=False):
     if not token:
         token = get_ms_token(auth_config, params['auth_method'], rest_scope)
 
+
+    access_token = token['access_token']
     headers = {
-        'Authorization': f'Bearer {token}',
+        'Authorization': f'Bearer {access_token}',
         'Content-Type': 'application/json'
     }
 
