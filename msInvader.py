@@ -89,12 +89,11 @@ def main():
     enabled_techniques = [tech for tech in config['techniques'] if tech['enabled']]
     methods = list(set([tech['parameters']['access_method'] for tech in enabled_techniques]))
 
-    rest_token = False
-    ews_token = False
-    graph_token = False
+    graph_token = {'access_token': None, 'refresh_token': None}
+    ews_token = {'access_token': None, 'refresh_token': None}
+    rest_token = {'access_token': None, 'refresh_token': None}
 
     logging.info(f"Identified {len(enabled_techniques)} enabled technique(s) on configuration file")
-
 
     if 'auth_method ' in config['authentication'].keys():
         logging.info(f"Obtaining authentication tokens required to execute simulations")
@@ -134,7 +133,7 @@ def main():
 
             elif technique['parameters']['access_method'] == 'ews':
 
-                read_email_ews(config['authentication'], technique['parameters'], ews_token)
+                read_email_ews(config['authentication'], technique['parameters'], ews_token['access_token'])
             
             elif technique['parameters']['access_method'] == 'rest':
                 # Exchange online management does not support Get-Message on M365
@@ -148,45 +147,45 @@ def main():
 
             elif technique['parameters']['access_method'] == 'ews':
 
-                create_rule_ews(config['authentication'], technique['parameters'], ews_token)
+                create_rule_ews(config['authentication'], technique['parameters'], ews_token['access_token'])
 
             elif technique['parameters']['access_method'] == 'rest':
 
-                create_rule_rest(config['authentication'], technique['parameters'], rest_token)
+                create_rule_rest(config['authentication'], technique['parameters'], rest_token['access_token'])
 
         elif technique['technique'] == 'enable_email_forwarding':
 
             if technique['parameters']['access_method'] == 'rest':
 
-                enable_email_forwarding_rest(config['authentication'], technique['parameters'], rest_token)      
+                enable_email_forwarding_rest(config['authentication'], technique['parameters'], rest_token['access_token'])      
 
         elif technique['technique'] == 'add_folder_permission':
 
             if technique['parameters']['access_method'] == 'rest':
 
-                modify_folder_permission_rest(config['authentication'], technique['parameters'], rest_token)      
+                modify_folder_permission_rest(config['authentication'], technique['parameters'], rest_token['access_token'])      
 
             if technique['parameters']['access_method'] == 'ews':
     
-                modify_folder_permission_ews(config['authentication'], technique['parameters'], ews_token)      
+                modify_folder_permission_ews(config['authentication'], technique['parameters'], ews_token['access_token'])      
 
         elif technique['technique'] == 'add_mailbox_delegation':
 
             if technique['parameters']['access_method'] == 'rest':
 
-                add_mailbox_delegation_rest(config['authentication'], technique['parameters'], rest_token)      
+                add_mailbox_delegation_rest(config['authentication'], technique['parameters'], rest_token['access_token'])      
 
         elif technique['technique'] == 'run_compliance_search':
 
             if technique['parameters']['access_method'] == 'rest':
 
-                run_compliance_search_rest(config['authentication'], technique['parameters'], rest_token)      
+                run_compliance_search_rest(config['authentication'], technique['parameters'], rest_token['access_token'])      
 
         elif technique['technique'] == 'create_mailfow_rule':
 
             if technique['parameters']['access_method'] == 'rest':
 
-                create_mailfow_rule_rest(config['authentication'], technique['parameters'], rest_token)      
+                create_mailfow_rule_rest(config['authentication'], technique['parameters'], rest_token['access_token'])      
 
     logging.info("************* Finished technique execution *************")
 

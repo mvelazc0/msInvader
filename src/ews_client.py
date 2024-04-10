@@ -270,15 +270,17 @@ def read_email_ews(auth_config, params, token=False):
     mailbox= params['mailbox']
 
     # Headers
+    access_token = token['access_token']
+    
     headers = {
-        "Authorization": f"Bearer {token}",
+        "Authorization": f"Bearer {access_token}",
         "Content-Type": "text/xml; charset=utf-8"
     }
 
     # Step 1: FindItem request to get email IDs
 
     # Check if we need exchange impersonation headers
-    if params['auth_method'] == 3:
+    if params['auth_method'] == 'client_credential':
         find_item_request = create_find_item_soap_request(mailbox, True)
 
     else:
@@ -290,8 +292,8 @@ def read_email_ews(auth_config, params, token=False):
         logging.info("200 OK")
     else:
         logging.error(f"FindItem operation failed with status code {find_item_response.status_code }")
-    #print(find_item_response.status_code)
-    #print(find_item_response.text)
+        #print(find_item_response.status_code)
+        print(find_item_response.text)
     find_item_root = ET.fromstring(find_item_response.content)
 
     # Extract ItemIds from FindItem response (update based on actual XML structure)
@@ -305,7 +307,7 @@ def read_email_ews(auth_config, params, token=False):
     for item_id in item_ids[:params['limit']]:
 
         # Check if we need exchange impersonation headers
-        if params['auth_method'] == 3:
+        if params['auth_method'] == 'client_credential':
             get_item_request = create_get_item_soap_request(item_id, mailbox, True)
 
         else:
@@ -332,7 +334,11 @@ def create_rule_ews(auth_config, params, token=False):
     rule_name =  params['rule_name']
     body_contains =  params['body_contains']
 
-    soap_request = create_forwarding_rule_soap_request(mailbox, forward_to, rule_name, body_contains)
+    if params['auth_method'] == 'client_credential':
+        soap_request = create_forwarding_rule_soap_request(mailbox, forward_to, rule_name, body_contains, True)
+
+    else:
+        soap_request = create_forwarding_rule_soap_request(mailbox, forward_to, rule_name, body_contains)
 
     if not token:
         token =  get_ms_token(auth_config, params['auth_method'], ews_scope)
@@ -384,7 +390,12 @@ def modify_folder_permission_ews(auth_config, params, token=False):
 
     logging.info("Running the add_folder_permissions technique using the EWS API")
 
-    find_item_body = create_find_folder_soap_request(params['mailbox'], params['folder'])
+    if params['auth_method'] == 'client_credential':
+
+        find_item_body = create_find_folder_soap_request(params['mailbox'], params['folder'], true)
+
+    else:
+        find_item_body = create_find_folder_soap_request(params['mailbox'], params['folder'])
 
     if not token:
         token = get_ms_token(auth_config, params['auth_method'], ews_scope)

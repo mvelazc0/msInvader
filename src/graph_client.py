@@ -16,10 +16,13 @@ def read_email_graph(auth_config, params, token=False):
     mailbox = params['mailbox']
     graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/Inbox/messages'
 
+
+    access_token = token['access_token']
     headers = {
-        'Authorization': f'Bearer {token}',
+        'Authorization': f'Bearer {access_token}',
         'Content-Type': 'application/json'
     }
+
     short_endpoint = graph_endpoint.replace("https://graph.microsoft.com","")
     logging.info(f"Submitting GET request to {short_endpoint}")
     response = requests.get(graph_endpoint, headers=headers)
@@ -47,8 +50,9 @@ def search_mailbox_graph(auth_config, params, token=False):
 
     graph_endpoint = f'https://graph.microsoft.com/v1.0/search/query'
 
+    access_token = token['access_token']
     headers = {
-        'Authorization': f'Bearer {token}',
+        'Authorization': f'Bearer {access_token}',
         'Content-Type': 'application/json'
     }
 
