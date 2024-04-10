@@ -40,6 +40,11 @@ Visit the [Wiki](https://github.com/mvelazc0/msInvader/wiki/) for documentation.
 
 Visit [Supported Techniques](https://github.com/mvelazc0/msInvader/wiki/Supported-Techniques) on the Wiki for technique descriptions.
 
+## Detections
+
+This section will compile public detection strategies tailored to the techniques simulated by msInvader.
+
+- [Office 365 Collection Techniques](https://research.splunk.com/stories/office_365_collection_techniques/) by the Splunk Threat Research Team
 
 ## Quick Start Guide
 
