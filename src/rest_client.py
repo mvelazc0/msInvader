@@ -41,6 +41,7 @@ def enable_email_forwarding_rest(auth_config, params, token=False):
 
     if response.status_code == 200:
         logging.info("200 - OK")
+        logging.info(f"Configured email forwarding successful")
         #print(f'Error: {response.status_code}')
         #print (response.text)    
 
@@ -80,8 +81,12 @@ def create_rule_rest(auth_config, params, token=False):
     logging.info("Calling the New-InboxRule operation on the REST API")
     response = requests.post(rest_endpoint, headers=headers, json=data)
 
+    rule_name = params['rule_name']
+
     if response.status_code == 200:
         logging.info("200 - OK")
+        logging.info(f"Created rule with name: {rule_name}")
+
         #print ('Created!')
         #print(f'Error: {response.status_code}')
         #print (response.text)    

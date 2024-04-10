@@ -408,7 +408,7 @@ def modify_folder_permission_ews(auth_config, params, token=False):
         token = get_ms_token(auth_config, params['auth_method'], ews_scope)
 
     access_token = token['access_token']
-    
+
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "text/xml; charset=utf-8"
@@ -445,9 +445,11 @@ def modify_folder_permission_ews(auth_config, params, token=False):
     logging.info("Calling the UpdateFolder operation on the EWS API")
     response = requests.post(ews_url, headers = headers, data=update_folder_body)
 
+    grantee =  params['grantee']
     # Process the response
     if response.status_code == 200:
         logging.info("200 - OK")
+        logging.info(f"Assigned read inbox permissions to {grantee}")
         #print(response.text)
 
     else:
