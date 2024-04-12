@@ -181,11 +181,11 @@ def main():
 
                 run_compliance_search_rest(config['authentication'], technique['parameters'], rest_token['access_token'])      
 
-        elif technique['technique'] == 'create_mailfow_rule':
+        elif technique['technique'] == 'create_mailflow_rule':
 
             if technique['parameters']['access_method'] == 'rest':
 
-                create_mailfow_rule_rest(config['authentication'], technique['parameters'], rest_token['access_token'])      
+                create_mailflow_rule_rest(config['authentication'], technique['parameters'], rest_token['access_token'])      
 
     logging.info("************* Finished technique execution *************")
 

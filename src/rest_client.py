@@ -258,7 +258,7 @@ def run_compliance_search_rest(auth_config, params, token=False):
         #print (response.text)   
 
 
-def create_mailfow_rule_rest(auth_config, params, token=False):
+def create_mailflow_rule_rest(auth_config, params, token=False):
 
     logging.info("Running the create_mailfow_rule technique using the REST API")
     tenant_id = auth_config['tenant_id']
