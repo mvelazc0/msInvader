@@ -162,5 +162,5 @@ def get_ms_token(auth_config, auth_method, scope):
         return get_ms_token_username_pass(auth_config['tenant_id'], auth_config['username'], auth_config['password'], scope)
     elif auth_method == 'device_code':
         return get_ms_token_device_code(auth_config['tenant_id'], scope)
-    elif auth_method == 'client_credential':
+    elif auth_method == 'client_credentials':
         return get_ms_token_client(auth_config['tenant_id'], auth_config['application_id'], auth_config['client_secret'], scope)
