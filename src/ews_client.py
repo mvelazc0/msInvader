@@ -280,7 +280,7 @@ def read_email_ews(auth_config, params, token=False):
     # Step 1: FindItem request to get email IDs
 
     # Check if we need exchange impersonation headers
-    if params['auth_method'] == 'client_credential':
+    if params['auth_method'] == 'client_credentials':
         find_item_request = create_find_item_soap_request(mailbox, True)
 
     else:
@@ -307,7 +307,7 @@ def read_email_ews(auth_config, params, token=False):
     for item_id in item_ids[:params['limit']]:
 
         # Check if we need exchange impersonation headers
-        if params['auth_method'] == 'client_credential':
+        if params['auth_method'] == 'client_credentials':
             get_item_request = create_get_item_soap_request(item_id, mailbox, True)
 
         else:
@@ -334,7 +334,7 @@ def create_rule_ews(auth_config, params, token=False):
     rule_name =  params['rule_name']
     body_contains =  params['body_contains']
 
-    if params['auth_method'] == 'client_credential':
+    if params['auth_method'] == 'client_credentials':
         soap_request = create_forwarding_rule_soap_request(mailbox, forward_to, rule_name, body_contains, True)
 
     else:
@@ -397,7 +397,7 @@ def modify_folder_permission_ews(auth_config, params, token=False):
 
     logging.info("Running the add_folder_permissions technique using the EWS API")
 
-    if params['auth_method'] == 'client_credential':
+    if params['auth_method'] == 'client_credentials':
 
         find_item_body = create_find_folder_soap_request(params['mailbox'], params['folder'], true)
 
