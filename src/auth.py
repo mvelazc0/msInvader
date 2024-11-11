@@ -94,8 +94,8 @@ def get_ms_token_device_code(tenant_id, scope):
     #print (user_code)
     #print (device_code)
 
-    print("Code:", user_code)    
-    print("Submit the code on the following URL as the simulation user:", "https://microsoft.com/devicelogin")
+    logging.info(f"Code: "+ user_code)    
+    logging.info(f"Submit the code on the following URL as the simulation user: https://microsoft.com/devicelogin")
 
     token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
     token_data = {
@@ -111,7 +111,7 @@ def get_ms_token_device_code(tenant_id, scope):
 
         if "error" in token_response:
             if token_response["error"] == "authorization_pending":
-                print("Authorization pending. Please complete the user authentication.")
+                logging.error("Authorization pending. Please complete the user authentication.")
             elif token_response["error"] == "slow_down":
                 time.sleep(5)  
             else:

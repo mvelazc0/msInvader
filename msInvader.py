@@ -191,6 +191,10 @@ def main():
 
             password_spray(technique['parameters'])
 
+        elif technique['technique'] == 'add_application_secret':
+            
+            add_application_secret_graph(config['authentication'], technique['parameters'], rest_token['access_token'])
+
     logging.info("************* Finished technique execution *************")
 
     

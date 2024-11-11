@@ -1,5 +1,6 @@
 import requests
 import logging
+import datetime
 from src.auth import get_ms_token
 
 ### Graph
@@ -217,3 +218,45 @@ def create_rule_graph(auth_config, params, token=False):
     else:
         logging.error(f"Operation failed with status code {response.status_code }")
         #print (response.text)    
+        
+
+def add_application_secret_graph(auth_config, params, token=False):
+
+    logging.info("Running the add_secret technique using the Graph API")
+
+    if not token:
+        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
+
+    app_id = params['app_id']
+    #secret_description = params['description']
+    secret_description = params.get('description', 'Simulation Secret')
+    secret_duration = params.get('secret_duration', 90)  # Duration in days
+    end_date = (datetime.datetime.utcnow() + datetime.timedelta(days=secret_duration)).isoformat() + "Z"
+    
+    graph_endpoint = f'https://graph.microsoft.com/v1.0/applications/{app_id}/addPassword'
+
+    access_token = token['access_token']
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+
+    data = {
+        "passwordCredential": {
+            "displayName": secret_description,
+            "endDateTime": end_date
+        }
+    }
+
+    short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
+    logging.info(f"Submitting POST request to {short_endpoint}")
+    response = requests.post(graph_endpoint, headers=headers, json=data)
+
+    if response.status_code == 200:
+        logging.info("200 OK - Secret added successfully")
+        secret_id = response.json().get('keyId')
+        logging.info(f"Added secret with ID: {secret_id}")
+    else:
+        logging.error(f"Operation failed with status code {response.status_code}")
+        print(response.text)
+        
