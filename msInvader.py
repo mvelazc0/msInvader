@@ -17,8 +17,10 @@ banner = """
  | '_ ` _ \/ __| | | | '_ \ \ / / _` |/ _` |/ _ \ '__|
  | | | | | \__ \_| |_| | | \ V / (_| | (_| |  __/ |   
  |_| |_| |_|___/_____|_| |_|\_/ \__,_|\__,_|\___|_|   
-
-                                                       
+                                
+                        M365/Azure Adversary Simulation
+                        https://github.com/mvelazc0/msInvader
+                       
                                    by Mauricio Velazco                                                      
                                              @mvelazco
 """
@@ -109,7 +111,6 @@ def main():
                 #ews_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], ews_scope)
 
     logging.info("************* Starting technique execution *************")
-
     
     for technique in enabled_techniques:
 
@@ -193,7 +194,11 @@ def main():
 
         elif technique['technique'] == 'add_application_secret':
             
-            add_application_secret_graph(config['authentication'], technique['parameters'], rest_token['access_token'])
+            add_application_secret_graph(config['authentication'], technique['parameters'], graph_token['access_token'])
+
+        elif technique['technique'] == 'add_service_principal':
+            
+            add_service_principal(config['authentication'], technique['parameters'], graph_token['access_token'])
 
     logging.info("************* Finished technique execution *************")
 
