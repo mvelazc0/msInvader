@@ -200,6 +200,10 @@ def main():
             
             add_service_principal(config['authentication'], technique['parameters'], graph_token['access_token'])
 
+        elif technique['technique'] == 'admin_consent':
+            
+            admin_consent_graph(config['authentication'], technique['parameters'], graph_token['access_token'])
+
     logging.info("************* Finished technique execution *************")
 
     

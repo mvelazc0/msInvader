@@ -293,4 +293,44 @@ def add_service_principal(auth_config, params, token=False):
     else:
         logging.error(f"Operation failed with status code {response.status_code}")
         print(response.text)
+
+
+def admin_consent_graph(auth_config, params, token=False):
+
+    logging.info("Running the admin_consent technique using the Graph API")
+
+    if not token:
+        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
+
+    client_id = params['client_id']  # The ID of the external multi-tenant app
+    tenant_id = auth_config['tenant_id']  # Your tenant ID
+    resource_id = params['resource_id']
+    consent_permissions = params['permissions']  # List of permissions to consent to
+
+    graph_endpoint = f'https://graph.microsoft.com/v1.0/{tenant_id}/oauth2PermissionGrants'
+
+    access_token = token['access_token']
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+
+    data = {
+        "clientId": client_id,
+        "consentType": "AllPrincipals",
+        "principalId": None,
+        "resourceId": resource_id,  # The service principal ID of the app being consented to
+        "scope": " ".join(consent_permissions)
+    }
+
+    short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
+    logging.info(f"Submitting POST request to {short_endpoint}")
+    response = requests.post(graph_endpoint, headers=headers, json=data)
+
+    if response.status_code == 201:
+        print (response.json())
+        logging.info("201 Created - Admin consent granted successfully")
+    else:
+        logging.error(f"Operation failed with status code {response.status_code}")
+        print(response.text)
         
