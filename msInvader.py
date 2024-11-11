@@ -187,6 +187,10 @@ def main():
 
                 create_mailflow_rule_rest(config['authentication'], technique['parameters'], rest_token['access_token'])      
 
+        elif technique['technique'] == 'password_spray':
+
+            password_spray(technique['parameters'])
+
     logging.info("************* Finished technique execution *************")
 
     
