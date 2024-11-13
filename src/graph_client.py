@@ -1,6 +1,7 @@
 import requests
 import logging
 import datetime
+import os
 from src.auth import get_ms_token
 
 ### Graph
@@ -109,9 +110,11 @@ def search_onedrive_graph(auth_config, params, token=False):
         token = get_ms_token(auth_config, params['auth_method'], graph_scope)
 
     graph_endpoint = f'https://graph.microsoft.com/v1.0/search/query'
+    access_token = token['access_token']
+    #print(access_token)
 
     headers = {
-        'Authorization': f'Bearer {token}',
+        'Authorization': f'Bearer {access_token}',
         'Content-Type': 'application/json'
     }
 
@@ -151,7 +154,15 @@ def search_onedrive_graph(auth_config, params, token=False):
                     hits_found = True
                     name = hit['resource']['name']
                     created = hit['resource']['createdDateTime']
+                    item_id = hit['resource'].get('id')  # Get the ID for downloading
                     logging.info(f"Found file name: {name} created at {created}")
+                    
+                                        # Download the file
+                    download_path = f"./downloads/{name}"  # Define where to save the downloaded file
+                    download_params = {'item_id': item_id}
+                    
+                    logging.info(f"Initiating download for file: {name}")
+                    download_onedrive_file(auth_config, download_params, download_path, token=token)
 
         if not hits_found:
             logging.info("Requested returned 0 results.")
@@ -373,3 +384,73 @@ def create_application_registration(auth_config, params, token=False):
     else:
         logging.error(f"Operation failed with status code {response.status_code}")
         print(response.text)        
+
+
+def download_onedrive_file(auth_config, params, save_path, token=False):
+    
+    logging.info("Running the download_onedrive_file technique using the Graph API")
+
+    if not token:
+        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
+
+    download_dir = os.path.dirname(save_path)
+    if not os.path.exists(download_dir):
+        os.makedirs(download_dir)
+        logging.info(f"Created directory: {download_dir}")
+
+    #user_id = params.get('user_id', 'me')  # Defaults to the current authenticated user
+    user_id = params.get('user_id')
+
+    if not user_id:  # If user_id is not provided, get it for the authenticated user
+        user_id = get_authenticated_user_id(auth_config, token=token)
+        if not user_id:
+            logging.error("Authenticated User ID not found; aborting download.")
+            return
+
+    item_id = params['item_id']  # The unique ID of the file to download
+
+    graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{user_id}/drive/items/{item_id}/content'
+
+    access_token = token['access_token']
+    headers = {
+        'Authorization': f'Bearer {access_token}'
+    }
+
+    short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
+    logging.info(f"Submitting GET request to {short_endpoint}")
+    response = requests.get(graph_endpoint, headers=headers, stream=True)
+
+    if response.status_code == 200:
+        logging.info("200 OK - File downloaded successfully")
+        
+        with open(save_path, 'wb') as file:
+            for chunk in response.iter_content(chunk_size=1024):
+                file.write(chunk)
+        
+        logging.info(f"File saved to {save_path}")
+    else:
+        logging.error(f"Operation failed with status code {response.status_code}")
+        print(response.text)
+        
+def get_authenticated_user_id(auth_config, token=False):
+    
+    if not token:
+        token = get_ms_token(auth_config, 'authorization_code', 'https://graph.microsoft.com/.default')
+
+    graph_endpoint = 'https://graph.microsoft.com/v1.0/me'
+
+    access_token = token['access_token']
+    headers = {
+        'Authorization': f'Bearer {access_token}'
+    }
+
+    response = requests.get(graph_endpoint, headers=headers)
+
+    if response.status_code == 200:
+        user_id = response.json().get('id')
+        logging.info(f"Authenticated User ID is {user_id}")
+        return user_id
+    else:
+        logging.error(f"Failed to retrieve authenticated user ID with status code {response.status_code}")
+        print(response.text)
+        return None        
