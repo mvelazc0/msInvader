@@ -287,7 +287,7 @@ def add_service_principal(auth_config, params, token=False):
 
     if response.status_code == 201:
         logging.info("201 Created - Service principal for external app added successfully")
-        print (response.json())
+        #print (response.json())
         service_principal_id = response.json().get('id')
         logging.info(f"Service principal ID: {service_principal_id}")
     else:
@@ -333,4 +333,43 @@ def admin_consent_graph(auth_config, params, token=False):
     else:
         logging.error(f"Operation failed with status code {response.status_code}")
         print(response.text)
-        
+
+
+def create_application_registration(auth_config, params, token=False):
+    logging.info("Running the create_application_registration technique using the Graph API")
+
+    if not token:
+        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
+
+    app_name = params['app_name']  
+    redirect_uris = params.get('redirect_uris', []) 
+    sign_in_audience = params.get('sign_in_audience', 'AzureADMyOrg')
+
+    graph_endpoint = 'https://graph.microsoft.com/v1.0/applications'
+
+    access_token = token['access_token']
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+
+    data = {
+        "displayName": app_name,
+        "signInAudience": sign_in_audience,
+        "web": {
+            "redirectUris": redirect_uris
+        }
+    }
+
+    short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
+    logging.info(f"Submitting POST request to {short_endpoint}")
+    response = requests.post(graph_endpoint, headers=headers, json=data)
+
+    if response.status_code == 201:
+        logging.info("201 Created - Application registration created successfully")
+        app_id = response.json().get('appId')
+        logging.info(f"New application App ID: {app_id}")
+        return response.json()
+    else:
+        logging.error(f"Operation failed with status code {response.status_code}")
+        print(response.text)        

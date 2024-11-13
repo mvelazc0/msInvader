@@ -204,6 +204,13 @@ def main():
             
             admin_consent_graph(config['authentication'], technique['parameters'], graph_token['access_token'])
 
+        elif technique['technique'] == 'create_app':
+            
+            app_id = create_application_registration(config['authentication'], technique['parameters'], graph_token['access_token'])
+            app_id = app_id.get('appId')
+            technique['parameters']['app_id']= app_id
+            add_service_principal(config['authentication'],technique['parameters'], graph_token['access_token'])
+
     logging.info("************* Finished technique execution *************")
 
     
