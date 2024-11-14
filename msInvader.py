@@ -211,6 +211,10 @@ def main():
             technique['parameters']['app_id']= app_id
             add_service_principal(config['authentication'],technique['parameters'], graph_token['access_token'])
 
+        elif technique['technique'] == 'send_mail':
+            
+            send_email_graph(config['authentication'], technique['parameters'], graph_token['access_token'])
+
     logging.info("************* Finished technique execution *************")
 
     

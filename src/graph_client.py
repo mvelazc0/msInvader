@@ -454,3 +454,54 @@ def get_authenticated_user_id(auth_config, token=False):
         logging.error(f"Failed to retrieve authenticated user ID with status code {response.status_code}")
         print(response.text)
         return None        
+    
+
+def send_email_graph(auth_config, params, token=False):
+
+    logging.info("Running the send_email technique using the Graph API")
+
+    if not token:
+        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
+        
+    access_token = token['access_token']
+        
+        
+    #user_id = params ['user_id']        
+    subject = params ['subject']
+    body_content = params ['body']
+    recipients = params ['recipients']
+
+    to_recipients = [{"emailAddress": {"address": email}} for email in recipients]
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+
+    #url = f"https://graph.microsoft.com/v1.0/users/{user_id}/sendMail"
+    graph_endpoint = f"https://graph.microsoft.com/v1.0/me/sendMail"
+
+    payload = {
+        "message": {
+            "subject": subject,
+            "body": {
+                "contentType": "HTML",
+                "content": body_content
+            },
+            "toRecipients": to_recipients
+        },
+        "saveToSentItems": "true"  
+    }
+    #print(payload)
+    short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
+    logging.info(f"Submitting GET request to {short_endpoint}")
+
+    response = requests.post(graph_endpoint, headers=headers, json=payload)
+
+    if response.status_code == 202:
+        logging.info("202 Accepted - Email sent successfully!")
+        #return {"message": "Email sent successfully"}
+    else:
+        logging.error(f"Failed to send emails with status code {response.status_code}")
+        #print (response.json())
+        #return response.json()  
