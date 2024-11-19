@@ -334,9 +334,8 @@ def create_rule_ews(auth_config, params, token=False):
     rule_name =  params['rule_name']
     body_contains =  params['body_contains']
 
-    if params['auth_method'] == 'client_credentials':
+    if params['ews_impersionation']:
         soap_request = create_forwarding_rule_soap_request(mailbox, forward_to, rule_name, body_contains, True)
-
     else:
         soap_request = create_forwarding_rule_soap_request(mailbox, forward_to, rule_name, body_contains)
 

@@ -162,7 +162,7 @@ def get_new_token_with_refresh_token(tenant_id, refresh_token, new_scope):
     else:
         logging.error(f'Error obtaining new access token. HTTP response: {response.status_code}')
 
-
+"""
 def get_ms_token(auth_config, auth_method, scope):
     
     if auth_method == 'resource_owner':
@@ -171,8 +171,16 @@ def get_ms_token(auth_config, auth_method, scope):
         return get_ms_token_device_code(auth_config['tenant_id'], scope)
     elif auth_method == 'client_credentials':
         return get_ms_token_client(auth_config['tenant_id'], auth_config['application_id'], auth_config['client_secret'], scope)
+"""    
+
+def get_ms_token(auth_config, auth_method, scope):
     
-    
+    if auth_method == 'resource_owner':
+        return get_ms_token_username_pass(auth_config['tenant_id'], auth_config['username'], auth_config['password'], scope)
+    elif auth_method == 'device_code':
+        return get_ms_token_device_code(auth_config['tenant_id'], scope)
+    elif auth_method == 'client_credentials':
+        return get_ms_token_client(auth_config['tenant_id'], auth_config['application_id'], auth_config['client_secret'], scope)    
 
 def password_spray(params, sleep=None, jitter=None, user_agent=None, proxy=None):
     

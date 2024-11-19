@@ -26,7 +26,8 @@ def read_email_graph(auth_config, params, token=False):
     }
 
     short_endpoint = graph_endpoint.replace("https://graph.microsoft.com","")
-    logging.info(f"Submitting GET request to v1.0/users/me/mailFolders/Inbox/messages")
+    #logging.info(f"Submitting GET request to v1.0/users/me/mailFolders/Inbox/messages")
+    logging.info(f"Submitting GET request to {short_endpoint}")
     response = requests.get(graph_endpoint, headers=headers)
 
     if response.status_code == 200:
@@ -40,7 +41,7 @@ def read_email_graph(auth_config, params, token=False):
 
     else:
         logging.error(f"Operation failed with status code {response.status_code }")
-        #print (response.text)
+        #print (response.json())
 
 
 def search_mailbox_graph(auth_config, params, token=False):
