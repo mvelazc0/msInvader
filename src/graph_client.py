@@ -189,14 +189,18 @@ def create_rule_graph(auth_config, params, token=False):
     forward_to = params ['forward_to']
     body_contains = params ['body_contains']
 
-    graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/Inbox/messageRules'
-    #graph_endpoint = f'https://graph.microsoft.com/v1.0/users/me/mailFolders/Inbox/messageRules'
+    #graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/Inbox/messageRules'
+    #graph_endpoint = f'https://graph.microsoft.com/v1.0/users/me/mailFolders/Inbox/messageRules'    
+    graph_endpoint = f'https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messageRules'    
+    access_token = token['access_token']
+    
+    #print(access_token)
 
     if not token:
         token = get_ms_token(auth_config, params['auth_method'], graph_scope)
 
     headers = {
-        'Authorization': f'Bearer {token}',
+        'Authorization': f'Bearer {access_token}',
         'Content-Type': 'application/json'
     }
 
@@ -222,14 +226,14 @@ def create_rule_graph(auth_config, params, token=False):
     }
     
     short_endpoint = graph_endpoint.replace("https://graph.microsoft.com","")
-    logging.info(f"Submitting POSt request to {short_endpoint}")
+    logging.info(f"Submitting POST request to {short_endpoint}")
     response = requests.post(graph_endpoint, headers=headers, json=data)
 
     if response.status_code == 201:
         logging.info("201 - Created")
     else:
         logging.error(f"Operation failed with status code {response.status_code }")
-        #print (response.text)    
+        print (response.json())    
         
 
 def add_application_secret_graph(auth_config, params, token=False):

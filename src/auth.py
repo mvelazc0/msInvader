@@ -86,8 +86,9 @@ def get_ms_token_device_code(tenant_id, scope):
     logging.info("Using device code OAuth flow to obtain a token")
 
     #client_id = '00b41c95-dab0-4487-9791-b9d2c32c80f2' # Office 365 Management. Works to read emails Graph and EWS.
-    
     client_id = 'd3590ed6-52b3-4102-aeff-aad2292ab01c' # Microsoft Office. Works for searching one drive files
+    
+
 
     device_code_response = get_device_code(tenant_id, client_id, scope)
 
