@@ -99,8 +99,8 @@ def get_ms_token_device_code(tenant_id, scope):
     #print (user_code)
     #print (device_code)
 
-    logging.info(f"Code: "+ user_code)    
-    logging.info(f"Submit the code on the following URL as the simulation user: https://microsoft.com/devicelogin")
+    #logging.info(f"Code: "+ user_code)    
+    logging.info(f"Submit {user_code} at https://microsoft.com/devicelogin for simulated token acquisition")
 
     token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
     token_data = {

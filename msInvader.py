@@ -205,43 +205,45 @@ def main():
             elif technique_name == 'enable_email_forwarding':
 
                 if access_method == 'rest':
-
+                    #W
                     enable_email_forwarding_rest(config['authentication'], parameters, tokens[session_name]['rest'])      
 
             elif technique_name == 'add_folder_permission':
 
                 if access_method == 'rest':
-
+                    #W
                     modify_folder_permission_rest(config['authentication'], parameters, tokens[session_name]['rest'])      
 
                 if access_method == 'ews':
-        
+                    #W
                     modify_folder_permission_ews(config['authentication'], parameters, tokens[session_name]['ews'])      
 
             elif technique_name == 'add_mailbox_delegation':
 
                 if access_method == 'rest':
-
-                    add_mailbox_delegation_rest(config['authentication'], parameters, rest_token['access_token'])      
+                    #W. 
+                    # Requires exchange admin
+                    add_mailbox_delegation_rest(config['authentication'], parameters, tokens[session_name]['rest'])      
 
             elif technique_name == 'run_compliance_search':
 
                 if access_method == 'rest':
-
-                    run_compliance_search_rest(config['authentication'], parameters, rest_token['access_token'])      
+                    #NW
+                    # Requires exchange admin
+                    run_compliance_search_rest(config['authentication'], parameters, tokens[session_name]['rest'])      
 
             elif technique_name == 'create_mailflow_rule':
 
                 if access_method == 'rest':
-
-                    create_mailflow_rule_rest(config['authentication'], parameters, rest_token['access_token'])      
+                    #W
+                    create_mailflow_rule_rest(config['authentication'], parameters, tokens[session_name]['rest'])      
 
             elif technique_name == 'password_spray':
-
+                #W
                 password_spray(technique['parameters'])
 
             elif technique_name == 'add_application_secret':
-                
+                #W
                 add_application_secret_graph(config['authentication'], parameters, tokens[session_name]['graph'])
 
             elif technique_name == 'add_service_principal':
