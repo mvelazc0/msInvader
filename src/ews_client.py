@@ -127,6 +127,59 @@ def create_forwarding_rule_soap_request(mailbox, forward_to, rule_name, body_con
             </m:UpdateInboxRules>
         </soap:Body>
     </soap:Envelope>'''
+    
+def create_moving_rule_soap_request(mailbox, destination_folder, rule_name, body_contains, impersonation=False):
+    """
+    Generates SOAP XML for creating a rule that moves emails with using EWS.
+
+    :param forward_to: The email address to forward emails to.
+    :param rule_name: The name of the forwarding rule.
+    :param body_contains: A string that must be contained in the email body to trigger the rule.
+    :return: A string containing the SOAP XML.
+    """
+    destination_folder=(destination_folder.lower()).replace(" ", "")
+
+    exchange_impersonation = f"""
+        <t:ExchangeImpersonation>
+            <t:ConnectingSID>
+                <t:PrimarySmtpAddress>{mailbox}</t:PrimarySmtpAddress>
+            </t:ConnectingSID>
+        </t:ExchangeImpersonation>""" if impersonation else ""
+
+    return f'''<?xml version="1.0" encoding="utf-8"?>
+    <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"
+                xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types"
+                xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+        <soap:Header>
+            <t:RequestServerVersion Version="Exchange2016" />
+            {exchange_impersonation}
+        </soap:Header>
+        <soap:Body>
+            <m:UpdateInboxRules>
+                <m:Operations>
+                    <t:CreateRuleOperation>
+                        <t:Rule>
+                            <t:DisplayName>{rule_name}</t:DisplayName>
+                            <t:Priority>1</t:Priority>
+                            <t:IsEnabled>true</t:IsEnabled>
+                            <t:Conditions>
+                                <t:ContainsBodyStrings>
+                                    <t:String>{body_contains}</t:String>
+                                </t:ContainsBodyStrings>
+                            </t:Conditions>
+                            <t:Exceptions />
+                            <t:Actions>
+                                <t:MoveToFolder>
+                                    <t:DistinguishedFolderId Id="{destination_folder}" />
+                                </t:MoveToFolder>
+                            </t:Actions>
+                        </t:Rule>
+                    </t:CreateRuleOperation>
+                </m:Operations>
+            </m:UpdateInboxRules>
+        </soap:Body>
+    </soap:Envelope>'''    
 
 def enable_email_forwarding_soap_request(mailbox, forwarding_address, impersonation=False):
 
@@ -363,8 +416,93 @@ def create_rule_ews(auth_config, params, token=False):
     else:
         #print(f"Failed to create rule. Status code: {response.status_code}")
         logging.error(f"UpdateInboxRules operation failed with status code {response.status_code}")
-        print(response.status_code)
-        print(response.text)
+        #print(response.status_code)
+        #print(response.text)
+
+
+def create_rule_ews2(auth_config, params, token=False):
+
+    logging.info("Running the create_rule technique using the EWS API")
+
+    mailbox = params['mailbox']
+    rule_name =  params['rule_name']
+    body_contains =  params['body_contains']
+    type = params['type']
+    
+    if type == 'forwarding_rule':
+        
+        forward_to =  params['forward_to']
+    
+        if params['ews_impersonation']:
+            soap_request = create_forwarding_rule_soap_request(mailbox, forward_to, rule_name, body_contains, True)
+        else:
+            soap_request = create_forwarding_rule_soap_request(mailbox, forward_to, rule_name, body_contains)
+
+        if not token:
+            token =  get_ms_token(auth_config, params['auth_method'], ews_scope)
+
+        # Send the EWS request with OAuth token
+        logging.info("Calling the UpdateInboxRules operation on the EWS API")
+
+        access_token = token['access_token']
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "text/xml; charset=utf-8"
+        }
+
+        response = requests.post(ews_url, headers=headers, data=soap_request)
+
+        # Process the response
+        if response.status_code == 200:
+            logging.info("200 OK")
+            logging.info(f"Created rule with name: {rule_name}")
+
+            #print(response.text)
+
+        else:
+            #print(f"Failed to create rule. Status code: {response.status_code}")
+            logging.error(f"UpdateInboxRules operation failed with status code {response.status_code}")
+            print(response.status_code)
+            print(response.text)
+            
+    elif type == 'moving_rule':
+        
+        destination_folder = params['destination_folder']    
+     
+        if params['ews_impersonation']:
+            soap_request = create_moving_rule_soap_request(mailbox, destination_folder, rule_name, body_contains, True)
+        else:
+            soap_request = create_moving_rule_soap_request(mailbox, destination_folder, rule_name, body_contains)
+
+        if not token:
+            token =  get_ms_token(auth_config, params['auth_method'], ews_scope)
+
+        # Send the EWS request with OAuth token
+        logging.info("Calling the UpdateInboxRules operation on the EWS API")
+
+        access_token = token['access_token']
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "text/xml; charset=utf-8"
+        }
+
+        response = requests.post(ews_url, headers=headers, data=soap_request)
+
+        # Process the response
+        if response.status_code == 200:
+            logging.info("200 OK")
+            logging.info(f"Created rule with name: {rule_name}")
+
+            #print(response.text)
+
+        else:
+            #print(f"Failed to create rule. Status code: {response.status_code}")
+            logging.error(f"UpdateInboxRules operation failed with status code {response.status_code}")
+            print(response.status_code)
+            print(response.text)
+
+
+
 
 """
 def enable_email_forwarding_ews(params, token):
@@ -398,7 +536,7 @@ def modify_folder_permission_ews(auth_config, params, token=False):
 
     if params['ews_impersonation']:
 
-        find_item_body = create_find_folder_soap_request(params['mailbox'], params['folder'], true)
+        find_item_body = create_find_folder_soap_request(params['mailbox'], params['folder'], True)
 
     else:
         find_item_body = create_find_folder_soap_request(params['mailbox'], params['folder'])

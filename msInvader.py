@@ -155,10 +155,10 @@ def main():
         logging.info(f"Identified {len(enabled_techniques)} enabled technique(s) in playbook '{playbook_name}'")
         
     
-        for technique in enabled_techniques:
-    
-            technique_name = technique['technique']
+        #for technique in enabled_techniques:
+        for index, technique in enumerate(enabled_techniques):
 
+            technique_name = technique['technique']
             parameters = technique['parameters']
             session_name = parameters.get('session', 'nosession')
             #session_name = parameters['session']
@@ -203,7 +203,7 @@ def main():
 
                 if access_method == 'ews':
                     #W
-                    create_rule_ews(config['authentication'], parameters, tokens[session_name]['ews'])
+                    create_rule_ews2(config['authentication'], parameters, tokens[session_name]['ews'])
 
                 elif access_method == 'rest':
                     #W
@@ -271,12 +271,14 @@ def main():
             elif technique_name == 'send_mail':
                 
                 send_email_graph(config['authentication'], parameters, tokens[session_name]['graph'])  
-                
-            if sleep is not None:
-                if jitter is not None:
-                    time.sleep(sleep + random.uniform(0, jitter))
-                else:
-                    time.sleep(sleep)
+
+            # Apply sleep only if this is not the last technique
+            if index < len(enabled_techniques) - 1:
+                if sleep is not None:
+                    if jitter is not None:
+                        time.sleep(sleep + random.uniform(0, jitter))
+                    else:
+                        time.sleep(sleep)
 
     logging.info("************* Finished technique execution *************")
 
