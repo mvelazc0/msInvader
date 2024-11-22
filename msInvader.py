@@ -129,7 +129,7 @@ def main():
 
     for session_name, session_details in config["authentication"]["sessions"].items():
         
-        token = get_ms_token(config['authentication'], session_details['type'], graph_scope)
+        token = get_ms_token(config['authentication'], session_details, graph_scope)
         add_token(session_name, "graph", token['access_token'], token['refresh_token'], "0")
         
         ews_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], token['refresh_token'], ews_scope)
@@ -143,7 +143,11 @@ def main():
     logging.info("************* Starting playbook execution *************")
 
     for playbook in config['playbooks']:
+        
         playbook_name = playbook.get('name', 'Unnamed Playbook')
+        sleep = playbook.get('sleep', 0)
+        jitter = playbook.get('jitter', 0)
+        
         logging.info(f"Processing playbook: {playbook_name}")
         
 
@@ -152,21 +156,24 @@ def main():
         
     
         for technique in enabled_techniques:
-            
+    
             technique_name = technique['technique']
+
             parameters = technique['parameters']
-            session_name = parameters['session']
+            session_name = parameters.get('session', 'nosession')
+            #session_name = parameters['session']
             access_method = parameters['access_method']
             parameters['ews_impersonation'] = False
+
             
-            if config['authentication']['sessions'][session_name]['type'] == 'service_principal':
+            if session_name != 'nosession' and config['authentication']['sessions'][session_name]['type'] == 'service_principal':
                 parameters['ews_impersonation'] = True
                 
-            if technique_name == 'search_mailbox':
+            if technique_name == 'search_email':
 
                 if access_method == 'graph':
                     #W
-                    search_mailbox_graph(config['authentication'], parameters, tokens[session_name]['graph'])
+                    search_email_graph(config['authentication'], parameters, tokens[session_name]['graph'])
 
             if technique_name == 'search_onedrive':
                 
@@ -264,6 +271,12 @@ def main():
             elif technique_name == 'send_mail':
                 
                 send_email_graph(config['authentication'], parameters, tokens[session_name]['graph'])  
+                
+            if sleep is not None:
+                if jitter is not None:
+                    time.sleep(sleep + random.uniform(0, jitter))
+                else:
+                    time.sleep(sleep)
 
     logging.info("************* Finished technique execution *************")
 

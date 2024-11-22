@@ -37,13 +37,13 @@ def get_ms_token_username_pass(tenant_id, username, password, scope):
 
     token_url = f'https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token'
 
-    full_scope = f'{scope} offline_access'
+    full_scope = f'{scope} offline_access' # required if we want a refresh token
 
     token_data = {
 
         #'client_id': '1950a258-227b-4e31-a9cf-717495945fc2', # Microsoft Azure PowerShell
-        'client_id': '00b41c95-dab0-4487-9791-b9d2c32c80f2',  # Office 365 Management. Works to read emails Graph and EWS.
-        #'client_id': 'd3590ed6-52b3-4102-aeff-aad2292ab01c',  # Microsoft Office. Also works to read emails Graph and EWS.
+        #'client_id': '00b41c95-dab0-4487-9791-b9d2c32c80f2',  # Office 365 Management. Works to read emails Graph and EWS.
+        'client_id': 'd3590ed6-52b3-4102-aeff-aad2292ab01c',  # Microsoft Office. Also works to read emails Graph and EWS.
         #'client_id': '00000002-0000-0ff1-ce00-000000000000', # Office 365 Exchange Online
         #'client_id': '00000006-0000-0ff1-ce00-000000000000', # Microsoft Office 365 Portal
         #'client_id': 'fb78d390-0c51-40cd-8e17-fdbfab77341b', # Microsoft Exchange REST API Based Powershell
@@ -58,15 +58,15 @@ def get_ms_token_username_pass(tenant_id, username, password, scope):
     }
 
     response = requests.post(token_url, data=token_data)
-    #print(response.text)
-    refresh_token = response.json().get('access_token')
+    #print(response.json())
+    refresh_token = response.json().get('refresh_token')
     access_token = response.json().get('access_token')
     
     if refresh_token and access_token:
         return {'access_token': access_token, 'refresh_token': refresh_token}
     else:
         logging.error (f'Error obtaining token. Http response: {response.status_code}')
-        print (response.text)
+        #print (response.text)
 
 
 def get_device_code(tenant_id, client_id, scope):
@@ -162,6 +162,7 @@ def get_new_token_with_refresh_token(tenant_id, refresh_token, new_scope):
         return {'access_token': new_access_token, 'refresh_token': new_refresh_token}
     else:
         logging.error(f'Error obtaining new access token. HTTP response: {response.status_code}')
+        print(response.json())
 
 """
 def get_ms_token(auth_config, auth_method, scope):
@@ -174,10 +175,14 @@ def get_ms_token(auth_config, auth_method, scope):
         return get_ms_token_client(auth_config['tenant_id'], auth_config['application_id'], auth_config['client_secret'], scope)
 """    
 
-def get_ms_token(auth_config, auth_method, scope):
+def get_ms_token(auth_config, session_details, scope):
+    
+    auth_method = session_details['type']
+    username = session_details['username']
+    password  = session_details['password']
     
     if auth_method == 'resource_owner':
-        return get_ms_token_username_pass(auth_config['tenant_id'], auth_config['username'], auth_config['password'], scope)
+        return get_ms_token_username_pass(auth_config['tenant_id'], username, password, scope)
     elif auth_method == 'device_code':
         return get_ms_token_device_code(auth_config['tenant_id'], scope)
     elif auth_method == 'client_credentials':

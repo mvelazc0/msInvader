@@ -44,9 +44,9 @@ def read_email_graph(auth_config, params, token=False):
         #print (response.json())
 
 
-def search_mailbox_graph(auth_config, params, token=False):
+def search_email_graph(auth_config, params, token=False):
 
-    logging.info("Running the search_mailbox technique using the Graph API")
+    logging.info("Running the search_email technique using the Graph API")
 
     if not token:
         token = get_ms_token(auth_config, params['auth_method'], graph_scope)
