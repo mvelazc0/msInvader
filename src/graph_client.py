@@ -626,9 +626,11 @@ def assign_app_role(auth_config, params, token=False):
         "appRoleId": app_role_id
     }
 
-    url = f"https://graph.microsoft.com/v1.0/servicePrincipals/{service_principal_id}/appRoleAssignments"
+    graph_endpoint = f"https://graph.microsoft.com/v1.0/servicePrincipals/{service_principal_id}/appRoleAssignments"
+    short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
+    logging.info(f"Submitting POST request to {short_endpoint}")
 
-    response = requests.post(url, headers = headers, json=body)
+    response = requests.post(graph_endpoint, headers = headers, json=body)
     if response.status_code == 201:
         logging.info(f"201 Created - App Role assigned succesfully to {service_principal_id}")
         
@@ -637,3 +639,48 @@ def assign_app_role(auth_config, params, token=False):
         #error_description = response.json().get('error_description', '')
         #logging.info(f"[*] Got an error trying to create the app role assignment: {error_description}")
         logging.error(f"Failed to assign app role with status code {response.status_code}")
+        
+        
+def create_user_graph(auth_config, params, token=False):
+
+    logging.info("Running the create_user technique using the Microsoft Graph API")
+
+    if not token:
+        token = get_ms_token(auth_config, params['auth_method'], 'https://graph.microsoft.com/.default')
+
+    # API Endpoint
+    graph_endpoint = "https://graph.microsoft.com/v1.0/users"
+
+    # Access token
+    access_token = token['access_token']
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+    mail_nick_name = params['user_principal_name'].split('@')[0]
+
+    # User details payload
+    user_payload = {
+        "accountEnabled": True,
+        "displayName": params['display_name'],
+        "mailNickname": mail_nick_name,
+        "userPrincipalName": params['user_principal_name'],
+        "passwordProfile": {
+            "forceChangePasswordNextSignIn": False,
+            "password": params['password']
+        }
+    }
+
+    short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
+    logging.info(f"Submitting POST request to {short_endpoint}")
+
+    # Send POST request to create the user
+    response = requests.post(graph_endpoint, headers=headers, json=user_payload)
+
+    if response.status_code == 201:
+        logging.info("201 Created - User created successfully.")
+        return response.json()
+    else:
+        logging.error(f"Failed to create user. Status code: {response.status_code}")
+        logging.error(response.text)
+        return {"error": response.json(), "status_code": response.status_code}        
