@@ -379,6 +379,7 @@ def read_email_ews(auth_config, params, token=False):
 
 
 def read_email_ews2(auth_config, params, token=False):
+    
     logging.info("Running the read_email technique using the EWS API")
 
     if not token:

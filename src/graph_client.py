@@ -639,13 +639,14 @@ def assign_app_role(auth_config, params, token=False):
         #error_description = response.json().get('error_description', '')
         #logging.info(f"[*] Got an error trying to create the app role assignment: {error_description}")
         logging.error(f"Failed to assign app role with status code {response.status_code}")
+        print (response.json())
         
         
 def create_user_graph(auth_config, params, token=False):
 
     logging.info("Running the create_user technique using the Graph API")
 
-    if not token:
+    if not token :
         token = get_ms_token(auth_config, params['auth_method'], 'https://graph.microsoft.com/.default')
 
     # API Endpoint

@@ -97,18 +97,21 @@ def get_token(session_name, scope):
         #    return refresh_access_token(session_name, scope, token_info["refresh_token"])
     return None
 
-"""
-def refresh_access_token(session_name, scope, refresh_token):
-    
-    # Simulate a refresh token API call (replace with actual logic)
-    new_access_token = f"new_{scope}_access_token_for_{session_name}"
-    new_refresh_token = f"new_{scope}_refresh_token_for_{session_name}"
-    new_expiry = time.time() + 3600  # 1 hour expiry
+#TODO: Need to re-implement this
+def refresh_tokens(config, session_name):
 
-    # Update the token storage
-    add_token(session_name, scope, new_access_token, new_refresh_token, new_expiry)
-    return new_access_token
-"""
+        logging.info("Refresing client credential tokens after assign_app_role")
+
+        session_details= config['authentication']['sessions'][session_name]
+    
+        graph_token = get_ms_token(config['authentication'], session_details, graph_scope)
+        add_token(session_name, "graph", graph_token['access_token'], "0", "0")
+        
+        ews_token = get_ms_token(config['authentication'], session_details, ews_scope)
+        add_token(session_name, "ews", ews_token['access_token'], "0", "0")
+
+        rest_token = get_ms_token(config['authentication'], session_details, rest_scope)
+        add_token(session_name, "ews", rest_token['access_token'], "0", "0")    
 
 def main():
 
@@ -310,6 +313,8 @@ def main():
             elif technique_name == 'assign_app_role':
                 #W
                 assign_app_role(config['authentication'], parameters, tokens[session_name]['graph']) 
+                time.sleep(15)
+                refresh_tokens(config, session_name )
 
             elif technique_name == 'create_user':
                 #W
