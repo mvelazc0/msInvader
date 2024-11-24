@@ -516,8 +516,6 @@ def send_email_graph(auth_config, params, token=False):
     #print("new_token")
     #print (new_token['access_token'])
     
-import logging
-import requests
 
 def enumerate_entities(auth_config, params, entity_type=None, token=False):
 
@@ -573,3 +571,41 @@ def enumerate_entities(auth_config, params, entity_type=None, token=False):
         else:
             logging.error(f"Failed to enumerate {entity}. Status code: {response.status_code}")
             logging.error(response.text)
+
+
+def change_user_password(auth_config, params, token=False):
+
+    logging.info(f"Running the change_password technique")
+    user_id = params['user_id']
+    new_password = params['new_password']
+
+    if not token:
+        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
+
+    access_token = token['access_token']
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+
+    graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{user_id}'
+    short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
+    logging.info(f"Submitting PATCH request to {short_endpoint}")
+
+    # Prepare the data payload for changing the password
+    data = {
+        "passwordProfile": {
+            "password": new_password,
+            "forceChangePasswordNextSignIn": False
+        }
+    }
+
+    # Send the PATCH request to update the password
+    response = requests.patch(graph_endpoint, headers=headers, json=data)
+
+    # Handle response
+    if response.status_code == 204:
+        logging.info(f"Password for user ID {user_id} successfully updated.")
+    else:
+        logging.error(f"Failed to change password for user ID {user_id}. Status code: {response.status_code}")
+        logging.error(response.text)
