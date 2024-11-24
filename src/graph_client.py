@@ -635,11 +635,46 @@ def assign_app_role(auth_config, params, token=False):
         logging.info(f"201 Created - App Role assigned succesfully to {service_principal_id}")
         
     else:
-        #logging.info(f"[*] {response.json() }")
-        #error_description = response.json().get('error_description', '')
-        #logging.info(f"[*] Got an error trying to create the app role assignment: {error_description}")
+
         logging.error(f"Failed to assign app role with status code {response.status_code}")
         print (response.json())
+
+
+def assign_app_role2(auth_config, params, token=False):
+
+    logging.info(f"Running the assign_app_role technique")
+    service_principal_id = params.get('service_principal_id')
+    resource_id = params.get('resource_id')
+    app_role_ids = params.get('app_role_id')  # Can be a single value or a list
+    
+    access_token = token['access_token']
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+
+    # Handle both single and multiple app roles
+    if not isinstance(app_role_ids, list):
+        app_role_ids = [app_role_ids]
+
+    for app_role_id in app_role_ids:
+        body = {
+            "principalId": service_principal_id,
+            "resourceId": resource_id,
+            "appRoleId": app_role_id
+        }
+
+        graph_endpoint = f"https://graph.microsoft.com/v1.0/servicePrincipals/{service_principal_id}/appRoleAssignments"
+        short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
+        logging.info(f"Submitting POST request to {short_endpoint} for app role {app_role_id}")
+
+        response = requests.post(graph_endpoint, headers=headers, json=body)
+
+        if response.status_code == 201:
+            logging.info(f"201 Created - App Role {app_role_id} assigned successfully to {service_principal_id}")
+        else:
+            logging.error(f"Failed to assign app role {app_role_id} with status code {response.status_code}")
+            logging.error(response.json())
         
         
 def create_user_graph(auth_config, params, token=False):
@@ -690,15 +725,20 @@ def assign_entra_role_graph(auth_config, params, token=False):
 
     logging.info("Running the assign_entra_role technique using the Graph API")
     
-    principal_id = params['principal_id']
-    role_id = params['principal_id']
+    principal_id = params.get('principal_id', 0)
+    upn = params.get('user_principal_name', "")
+    role_id = params['role_id']
     
-
+    if principal_id == 0:
+        principal_id =  get_user_object_guid(auth_config, params, upn, token)
+    
     if not token:
         token = get_ms_token(auth_config, params['auth_method'], 'https://graph.microsoft.com/.default')
 
+
+    access_token = token['access_token']
     headers = {
-        'Authorization': f'Bearer {token}',
+        'Authorization': f'Bearer {access_token}',
         'Content-Type': 'application/json'
     }
 
@@ -722,4 +762,43 @@ def assign_entra_role_graph(auth_config, params, token=False):
         #logging.info(f"[*] {response.json() }")
         #error_description = response.json().get('error_description', '')
         logging.error(f"Failed to assign Entra role with status code: {response.status_code}")
+        print(response.json())
+
+def get_user_object_guid(auth_config, params, upn, token=False):
+
+    #upn = params ['user_principal_name']
+
+    logging.info(f"Retrieving Object GUID for UPN: {upn}")
+
+    # Obtain token if not provided
+    if not token:
+        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
+
+    access_token = token['access_token']
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+
+    # Graph API endpoint to retrieve the user by UPN
+    graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{upn}'
+    short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
+    logging.info(f"Submitting GET request to {short_endpoint}")
+
+    # Make the GET request
+    response = requests.get(graph_endpoint, headers=headers)
+
+    # Process the response
+    if response.status_code == 200:
+        user_data = response.json()
+        object_id = user_data.get('id')
+        logging.info(f"Successfully retrieved Object GUID for UPN {upn}: {object_id}")
+        return object_id
+    elif response.status_code == 404:
+        logging.error(f"User with UPN {upn} not found.")
+    else:
+        logging.error(f"Failed to retrieve Object GUID for UPN {upn}. Status code: {response.status_code}")
+        logging.error(response.text)
+
+    return None
         

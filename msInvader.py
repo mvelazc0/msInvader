@@ -312,13 +312,17 @@ def main():
   
             elif technique_name == 'assign_app_role':
                 #W
-                assign_app_role(config['authentication'], parameters, tokens[session_name]['graph']) 
+                assign_app_role2(config['authentication'], parameters, tokens[session_name]['graph']) 
                 time.sleep(15)
                 refresh_tokens(config, session_name )
 
             elif technique_name == 'create_user':
                 #W
                 create_user_graph(config['authentication'], parameters, tokens[session_name]['graph']) 
+
+            elif technique_name == 'assign_entra_role':
+                #W
+                assign_entra_role_graph(config['authentication'], parameters, tokens[session_name]['graph']) 
                 
             # Apply sleep only if this is not the last technique
             if index < len(enabled_techniques) - 1:
