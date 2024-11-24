@@ -643,7 +643,7 @@ def assign_app_role(auth_config, params, token=False):
         
 def create_user_graph(auth_config, params, token=False):
 
-    logging.info("Running the create_user technique using the Microsoft Graph API")
+    logging.info("Running the create_user technique using the Graph API")
 
     if not token:
         token = get_ms_token(auth_config, params['auth_method'], 'https://graph.microsoft.com/.default')
@@ -679,8 +679,46 @@ def create_user_graph(auth_config, params, token=False):
 
     if response.status_code == 201:
         logging.info("201 Created - User created successfully.")
-        return response.json()
+
     else:
-        logging.error(f"Failed to create user. Status code: {response.status_code}")
-        logging.error(response.text)
-        return {"error": response.json(), "status_code": response.status_code}        
+        logging.error(f"Failed to create user with status code: {response.status_code}")
+        #logging.error(response.text)
+    
+    
+def assign_entra_role_graph(auth_config, params, token=False):
+
+    logging.info("Running the assign_entra_role technique using the Graph API")
+    
+    principal_id = params['principal_id']
+    role_id = params['principal_id']
+    
+
+    if not token:
+        token = get_ms_token(auth_config, params['auth_method'], 'https://graph.microsoft.com/.default')
+
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+
+    body = {
+        "principalId": principal_id,
+        "roleDefinitionId": role_id,
+        "directoryScopeId": "/"
+    }
+
+    graph_endpoint = f"https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments"
+    short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
+    logging.info(f"Submitting POST request to {short_endpoint}")
+
+    response = requests.post(graph_endpoint, headers = headers, json=body)
+    if response.status_code == 201:
+
+        logging.info("201 Created - Entra Role assiggned succesfully.")
+
+
+    else:
+        #logging.info(f"[*] {response.json() }")
+        #error_description = response.json().get('error_description', '')
+        logging.error(f"Failed to assign Entra role with status code: {response.status_code}")
+        
