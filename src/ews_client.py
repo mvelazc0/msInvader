@@ -378,6 +378,70 @@ def read_email_ews(auth_config, params, token=False):
             #print(f"Subject: {subject}\nBody: {body}\n")
 
 
+def read_email_ews2(auth_config, params, token=False):
+    logging.info("Running the read_email technique using the EWS API")
+
+    if not token:
+        token = get_ms_token(auth_config, params['auth_method'], ews_scope)
+
+    mailboxes = params['mailbox']
+    if not isinstance(mailboxes, list):  
+        mailboxes = [mailboxes]
+
+    access_token = token['access_token']
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "text/xml; charset=utf-8"
+    }
+
+    for mailbox in mailboxes:
+        logging.info(f"Processing mailbox: {mailbox}")
+
+        # Step 1: FindItem request to get email IDs
+        if params.get('ews_impersonation'):
+            find_item_request = create_find_item_soap_request(mailbox, True)
+        else:
+            find_item_request = create_find_item_soap_request(mailbox)
+
+        logging.info("Calling the FindItem operation on the EWS API")
+        find_item_response = requests.post(ews_url, headers=headers, data=find_item_request)
+        if find_item_response.status_code == 200:
+            logging.info("200 OK")
+        else:
+            logging.error(f"FindItem operation failed with status code {find_item_response.status_code}")
+            print(find_item_response.text)
+            continue
+
+        find_item_root = ET.fromstring(find_item_response.content)
+
+        # Extract ItemIds from FindItem response (update based on actual XML structure)
+        item_ids = []
+        for elem in find_item_root.findall('.//{http://schemas.microsoft.com/exchange/services/2006/types}ItemId'):
+            item_ids.append(elem.attrib['Id'])
+
+        # Step 2: GetItem requests to read emails
+        logging.info(f"Calling the GetItem operation on the EWS API for found emails in {mailbox}")
+        for item_id in item_ids[:params['limit']]:
+            if params.get('ews_impersonation'):
+                get_item_request = create_get_item_soap_request(item_id, mailbox, True)
+            else:
+                get_item_request = create_get_item_soap_request(item_id, mailbox)
+
+            get_item_response = requests.post(ews_url, headers=headers, data=get_item_request)
+            if get_item_response.status_code != 200:
+                logging.error(f"GetItem operation failed with status code {get_item_response.status_code}")
+                print(get_item_response.text)
+                continue
+
+            get_item_root = ET.fromstring(get_item_response.content)
+
+            # Extract email details from GetItem response (update based on actual XML structure)
+            for message in get_item_root.findall('.//{http://schemas.microsoft.com/exchange/services/2006/types}Message'):
+                subject = message.find('{http://schemas.microsoft.com/exchange/services/2006/types}Subject').text
+                body = message.find('{http://schemas.microsoft.com/exchange/services/2006/types}Body').text
+                logging.info(f"Read email with subject: {subject}")
+
+
 def create_rule_ews(auth_config, params, token=False):
 
     logging.info("Running the create_rule technique using the EWS API")

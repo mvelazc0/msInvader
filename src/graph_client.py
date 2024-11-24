@@ -606,3 +606,34 @@ def change_user_password(auth_config, params, token=False):
     else:
         logging.error(f"Failed to change password for user ID {user_id}. Status code: {response.status_code}")
         logging.error(response.text)
+        
+def assign_app_role(auth_config, params, token=False):
+
+    logging.info(f"Running the assign_app_role technique")
+    service_principal_id = params.get('service_principal_id')
+    resource_id = params.get('resource_id')
+    app_role_id = params.get('app_role_id')
+
+    access_token = token['access_token']
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+
+    body = {
+        "principalId": service_principal_id,
+        "resourceId": resource_id,
+        "appRoleId": app_role_id
+    }
+
+    url = f"https://graph.microsoft.com/v1.0/servicePrincipals/{service_principal_id}/appRoleAssignments"
+
+    response = requests.post(url, headers = headers, json=body)
+    if response.status_code == 201:
+        logging.info(f"201 Created - App Role assigned succesfully to {service_principal_id}")
+        
+    else:
+        #logging.info(f"[*] {response.json() }")
+        #error_description = response.json().get('error_description', '')
+        #logging.info(f"[*] Got an error trying to create the app role assignment: {error_description}")
+        logging.error(f"Failed to assign app role with status code {response.status_code}")

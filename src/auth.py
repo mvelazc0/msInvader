@@ -6,7 +6,6 @@ import random
 def get_ms_token_client(tenant_id, client_id, client_secret, scope):
 
     logging.info("Using client credential OAuth flow to obtain a token")
-
     token_url = f'https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token'
 
     token_data = {
@@ -18,14 +17,14 @@ def get_ms_token_client(tenant_id, client_id, client_secret, scope):
 
     response = requests.post(token_url, data=token_data)
 
-    refresh_token = response.json().get('access_token')
+    refresh_token = response.json().get('refresh_token')
     access_token = response.json().get('access_token')
 
-    if refresh_token and access_token:
-        return {'access_token': access_token, 'refresh_token': refresh_token}
+    if access_token:
+        return {'access_token': access_token, 'refresh_token': False}
     else:
         logging.error (f'Error obtaining token. Http response: {response.status_code}')
-        #print (response.text)
+        print (response.text)
 
 
 
@@ -177,16 +176,18 @@ def get_ms_token(auth_config, auth_method, scope):
 
 def get_ms_token(auth_config, session_details, scope):
     
-    auth_method = session_details['type']
-    username = session_details['username']
+    auth_method = session_details.get('type', '') 
+    username = session_details.get('username', '')
     password  = session_details.get('password', '')
+    app_id = session_details.get('app_id', '')
+    secret = session_details.get('secret', '')
     
     if auth_method == 'resource_owner':
         return get_ms_token_username_pass(auth_config['tenant_id'], username, password, scope)
     elif auth_method == 'device_code':
         return get_ms_token_device_code(auth_config['tenant_id'], scope)
     elif auth_method == 'client_credentials':
-        return get_ms_token_client(auth_config['tenant_id'], auth_config['application_id'], auth_config['client_secret'], scope)    
+        return get_ms_token_client(auth_config['tenant_id'], app_id, secret, scope)    
 
 def password_spray(params, sleep=None, jitter=None, user_agent=None, proxy=None):
     

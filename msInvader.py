@@ -129,16 +129,26 @@ def main():
 
     for session_name, session_details in config["authentication"]["sessions"].items():
         
-        token = get_ms_token(config['authentication'], session_details, graph_scope)
-        add_token(session_name, "graph", token['access_token'], token['refresh_token'], "0")
-        
-        ews_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], token['refresh_token'], ews_scope)
-        add_token(session_name, "ews", ews_token['access_token'], ews_token['refresh_token'], "0")
+        if session_details['type'] != 'client_credentials':
+            graph_token = get_ms_token(config['authentication'], session_details, graph_scope)
+            add_token(session_name, "graph", graph_token['access_token'], graph_token['refresh_token'], "0")
+            
+            ews_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], ews_scope)
+            add_token(session_name, "ews", ews_token['access_token'], ews_token['refresh_token'], "0")
 
-        rest_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], token['refresh_token'], rest_scope)
-        add_token(session_name, "rest", rest_token['access_token'], rest_token['refresh_token'], "0")        
+            rest_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], rest_scope)
+            add_token(session_name, "rest", rest_token['access_token'], rest_token['refresh_token'], "0")        
         
-        #print(tokens)
+        else:
+            graph_token = get_ms_token(config['authentication'], session_details, graph_scope)
+            add_token(session_name, "graph", graph_token['access_token'], "0", "0")
+            
+            ews_token = get_ms_token(config['authentication'], session_details, ews_scope)
+            add_token(session_name, "ews", ews_token['access_token'], "0", "0")
+ 
+            rest_token = get_ms_token(config['authentication'], session_details, rest_scope)
+            add_token(session_name, "ews", rest_token['access_token'], "0", "0")
+            
         
     logging.info("************* Starting playbook execution *************")
 
@@ -166,7 +176,7 @@ def main():
             parameters['ews_impersonation'] = False
 
             
-            if session_name != 'nosession' and config['authentication']['sessions'][session_name]['type'] == 'service_principal':
+            if session_name != 'nosession' and config['authentication']['sessions'][session_name]['type'] == 'client_credentials':
                 parameters['ews_impersonation'] = True
                 
             if technique_name == 'search_email':
@@ -189,7 +199,7 @@ def main():
 
                 elif access_method == 'ews':
                     #W
-                    read_email_ews(config['authentication'], parameters, tokens[session_name]['ews'])
+                    read_email_ews2(config['authentication'], parameters, tokens[session_name]['ews'])
                 
                 #elif access_method == 'rest':
                     # Exchange online management does not support Get-Message on M365
@@ -296,6 +306,10 @@ def main():
             elif technique_name == 'change_password':
                 #W
                 change_user_password(config['authentication'], parameters, tokens[session_name]['graph']) 
+  
+            elif technique_name == 'assign_app_role':
+                #W
+                assign_app_role(config['authentication'], parameters, tokens[session_name]['graph']) 
                 
             # Apply sleep only if this is not the last technique
             if index < len(enabled_techniques) - 1:
