@@ -515,3 +515,61 @@ def send_email_graph(auth_config, params, token=False):
     #new_token = get_new_token_with_refresh_token(auth_config['tenant_id'], refresh_token, "https://outlook.office365.com/.default")
     #print("new_token")
     #print (new_token['access_token'])
+    
+import logging
+import requests
+
+def enumerate_entities(auth_config, params, entity_type=None, token=False):
+
+    # Supported entity types and their endpoints
+    endpoints = {
+        'users': 'https://graph.microsoft.com/v1.0/users',
+        'groups': 'https://graph.microsoft.com/v1.0/groups',
+        'applications': 'https://graph.microsoft.com/v1.0/applications',
+        'service_principals': 'https://graph.microsoft.com/v1.0/servicePrincipals',
+        'directory_roles': 'https://graph.microsoft.com/v1.0/directoryRoles',
+        'devices': 'https://graph.microsoft.com/v1.0/devices',
+        'teams': 'https://graph.microsoft.com/v1.0/teams',
+        'sites': 'https://graph.microsoft.com/v1.0/sites',
+    }
+
+    # If no entity_type is provided, enumerate all supported entities
+    if entity_type is None:
+        entity_types_to_enumerate = endpoints.keys()
+    elif isinstance(entity_type, str):
+        # If a single entity type is provided
+        entity_types_to_enumerate = [entity_type]
+    elif isinstance(entity_type, list):
+        # If a list of entity types is provided
+        entity_types_to_enumerate = entity_type
+    else:
+        logging.error("Invalid entity_type format. Must be a string, list, or None.")
+        return
+
+    if not token:
+        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
+
+    access_token = token['access_token']
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+
+    for entity in entity_types_to_enumerate:
+        if entity not in endpoints:
+            logging.error(f"Unsupported entity type: {entity}")
+            continue
+
+        logging.info(f"Running the enumerate_{entity} technique")
+        graph_endpoint = endpoints[entity]
+        short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
+        logging.info(f"Submitting GET request to {short_endpoint}")
+
+        response = requests.get(graph_endpoint, headers=headers)
+
+        if response.status_code == 200:
+            entities = response.json().get('value', [])
+            logging.info(f"Enumeration successful. Found {len(entities)} {entity}.")
+        else:
+            logging.error(f"Failed to enumerate {entity}. Status code: {response.status_code}")
+            logging.error(response.text)

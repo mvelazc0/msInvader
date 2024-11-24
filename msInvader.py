@@ -269,9 +269,30 @@ def main():
                 add_service_principal(config['authentication'],parameters, tokens[session_name]['graph'])
 
             elif technique_name == 'send_mail':
-                
+                ##
                 send_email_graph(config['authentication'], parameters, tokens[session_name]['graph'])  
+                
 
+            elif technique_name == 'enumerate_users':
+                #W
+                enumerate_entities(config['authentication'], parameters, "users", tokens[session_name]['graph'])                  
+
+            elif technique_name == 'enumerate_groups':
+                #W
+                enumerate_entities(config['authentication'], parameters, "groups", tokens[session_name]['graph'])    
+                
+            elif technique_name == 'enumerate_applications':
+                #W
+                enumerate_entities(config['authentication'], parameters, "applications", tokens[session_name]['graph'])    
+                
+            elif technique_name == 'enumerate_service_principals':
+                #W
+                enumerate_entities(config['authentication'], parameters, "service_principals", tokens[session_name]['graph']) 
+
+            elif technique_name == 'enumerate_directory_roles':
+                #W
+                enumerate_entities(config['authentication'], parameters, "directory_roles", tokens[session_name]['graph']) 
+                
             # Apply sleep only if this is not the last technique
             if index < len(enabled_techniques) - 1:
                 if sleep is not None:

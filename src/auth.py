@@ -179,7 +179,7 @@ def get_ms_token(auth_config, session_details, scope):
     
     auth_method = session_details['type']
     username = session_details['username']
-    password  = session_details['password']
+    password  = session_details.get('password', '')
     
     if auth_method == 'resource_owner':
         return get_ms_token_username_pass(auth_config['tenant_id'], username, password, scope)
