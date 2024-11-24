@@ -592,7 +592,6 @@ def change_user_password(auth_config, params, token=False):
     short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
     logging.info(f"Submitting PATCH request to {short_endpoint}")
 
-    # Prepare the data payload for changing the password
     data = {
         "passwordProfile": {
             "password": new_password,
@@ -600,10 +599,8 @@ def change_user_password(auth_config, params, token=False):
         }
     }
 
-    # Send the PATCH request to update the password
     response = requests.patch(graph_endpoint, headers=headers, json=data)
 
-    # Handle response
     if response.status_code == 204:
         logging.info(f"Password for user ID {user_id} successfully updated.")
     else:
