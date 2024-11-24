@@ -313,7 +313,7 @@ def main():
             elif technique_name == 'assign_app_role':
                 #W
                 assign_app_role2(config['authentication'], parameters, tokens[session_name]['graph']) 
-                time.sleep(15)
+                time.sleep(20)
                 refresh_tokens(config, session_name )
 
             elif technique_name == 'create_user':

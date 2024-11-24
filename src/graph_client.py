@@ -718,7 +718,7 @@ def create_user_graph(auth_config, params, token=False):
 
     else:
         logging.error(f"Failed to create user with status code: {response.status_code}")
-        #logging.error(response.text)
+        print(response.json())
     
     
 def assign_entra_role_graph(auth_config, params, token=False):

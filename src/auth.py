@@ -80,9 +80,9 @@ def get_device_code(tenant_id, client_id, scope):
     response = requests.post(url, data=data).json()
     return response
 
-def get_ms_token_device_code(tenant_id, scope):
+def get_ms_token_device_code(tenant_id, username , scope):
 
-    logging.info("Using device code OAuth flow to obtain a token")
+    logging.info(f"Using device code OAuth flow to obtain a token for {username}")
 
     #client_id = '00b41c95-dab0-4487-9791-b9d2c32c80f2' # Office 365 Management. Works to read emails Graph and EWS.
     client_id = 'd3590ed6-52b3-4102-aeff-aad2292ab01c' # Microsoft Office. Works for searching one drive files
@@ -185,7 +185,7 @@ def get_ms_token(auth_config, session_details, scope):
     if auth_method == 'resource_owner':
         return get_ms_token_username_pass(auth_config['tenant_id'], username, password, scope)
     elif auth_method == 'device_code':
-        return get_ms_token_device_code(auth_config['tenant_id'], scope)
+        return get_ms_token_device_code(auth_config['tenant_id'], username, scope)
     elif auth_method == 'client_credentials':
         return get_ms_token_client(auth_config['tenant_id'], app_id, secret, scope)    
 
