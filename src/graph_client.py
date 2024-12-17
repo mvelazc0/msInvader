@@ -26,7 +26,8 @@ def read_email_graph(auth_config, params, token=False):
     }
 
     short_endpoint = graph_endpoint.replace("https://graph.microsoft.com","")
-    logging.info(f"Submitting GET request to v1.0/users/me/mailFolders/Inbox/messages")
+    #logging.info(f"Submitting GET request to v1.0/users/me/mailFolders/Inbox/messages")
+    logging.info(f"Submitting GET request to {short_endpoint}")
     response = requests.get(graph_endpoint, headers=headers)
 
     if response.status_code == 200:
@@ -40,12 +41,12 @@ def read_email_graph(auth_config, params, token=False):
 
     else:
         logging.error(f"Operation failed with status code {response.status_code }")
-        #print (response.text)
+        #print (response.json())
 
 
-def search_mailbox_graph(auth_config, params, token=False):
+def search_email_graph(auth_config, params, token=False):
 
-    logging.info("Running the search_mailbox technique using the Graph API")
+    logging.info("Running the search_email technique using the Graph API")
 
     if not token:
         token = get_ms_token(auth_config, params['auth_method'], graph_scope)
@@ -188,14 +189,18 @@ def create_rule_graph(auth_config, params, token=False):
     forward_to = params ['forward_to']
     body_contains = params ['body_contains']
 
-    graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/Inbox/messageRules'
-    #graph_endpoint = f'https://graph.microsoft.com/v1.0/users/me/mailFolders/Inbox/messageRules'
+    #graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/Inbox/messageRules'
+    #graph_endpoint = f'https://graph.microsoft.com/v1.0/users/me/mailFolders/Inbox/messageRules'    
+    graph_endpoint = f'https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messageRules'    
+    access_token = token['access_token']
+    
+    #print(access_token)
 
     if not token:
         token = get_ms_token(auth_config, params['auth_method'], graph_scope)
 
     headers = {
-        'Authorization': f'Bearer {token}',
+        'Authorization': f'Bearer {access_token}',
         'Content-Type': 'application/json'
     }
 
@@ -221,14 +226,14 @@ def create_rule_graph(auth_config, params, token=False):
     }
     
     short_endpoint = graph_endpoint.replace("https://graph.microsoft.com","")
-    logging.info(f"Submitting POSt request to {short_endpoint}")
+    logging.info(f"Submitting POST request to {short_endpoint}")
     response = requests.post(graph_endpoint, headers=headers, json=data)
 
     if response.status_code == 201:
         logging.info("201 - Created")
     else:
         logging.error(f"Operation failed with status code {response.status_code }")
-        #print (response.text)    
+        print (response.json())    
         
 
 def add_application_secret_graph(auth_config, params, token=False):
@@ -510,3 +515,290 @@ def send_email_graph(auth_config, params, token=False):
     #new_token = get_new_token_with_refresh_token(auth_config['tenant_id'], refresh_token, "https://outlook.office365.com/.default")
     #print("new_token")
     #print (new_token['access_token'])
+    
+
+def enumerate_entities(auth_config, params, entity_type=None, token=False):
+
+    # Supported entity types and their endpoints
+    endpoints = {
+        'users': 'https://graph.microsoft.com/v1.0/users',
+        'groups': 'https://graph.microsoft.com/v1.0/groups',
+        'applications': 'https://graph.microsoft.com/v1.0/applications',
+        'service_principals': 'https://graph.microsoft.com/v1.0/servicePrincipals',
+        'directory_roles': 'https://graph.microsoft.com/v1.0/directoryRoles',
+        'devices': 'https://graph.microsoft.com/v1.0/devices',
+        'teams': 'https://graph.microsoft.com/v1.0/teams',
+        'sites': 'https://graph.microsoft.com/v1.0/sites',
+    }
+
+    # If no entity_type is provided, enumerate all supported entities
+    if entity_type is None:
+        entity_types_to_enumerate = endpoints.keys()
+    elif isinstance(entity_type, str):
+        # If a single entity type is provided
+        entity_types_to_enumerate = [entity_type]
+    elif isinstance(entity_type, list):
+        # If a list of entity types is provided
+        entity_types_to_enumerate = entity_type
+    else:
+        logging.error("Invalid entity_type format. Must be a string, list, or None.")
+        return
+
+    if not token:
+        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
+
+    access_token = token['access_token']
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+
+    for entity in entity_types_to_enumerate:
+        if entity not in endpoints:
+            logging.error(f"Unsupported entity type: {entity}")
+            continue
+
+        logging.info(f"Running the enumerate_{entity} technique")
+        graph_endpoint = endpoints[entity]
+        short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
+        logging.info(f"Submitting GET request to {short_endpoint}")
+
+        response = requests.get(graph_endpoint, headers=headers)
+
+        if response.status_code == 200:
+            entities = response.json().get('value', [])
+            logging.info(f"Enumeration successful. Found {len(entities)} {entity}.")
+        else:
+            logging.error(f"Failed to enumerate {entity}. Status code: {response.status_code}")
+            logging.error(response.text)
+
+
+def change_user_password(auth_config, params, token=False):
+
+    logging.info(f"Running the change_password technique")
+    user_id = params['user_id']
+    new_password = params['new_password']
+
+    if not token:
+        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
+
+    access_token = token['access_token']
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+
+    graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{user_id}'
+    short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
+    logging.info(f"Submitting PATCH request to {short_endpoint}")
+
+    data = {
+        "passwordProfile": {
+            "password": new_password,
+            "forceChangePasswordNextSignIn": False
+        }
+    }
+
+    response = requests.patch(graph_endpoint, headers=headers, json=data)
+
+    if response.status_code == 204:
+        logging.info(f"Password for user ID {user_id} successfully updated.")
+    else:
+        logging.error(f"Failed to change password for user ID {user_id}. Status code: {response.status_code}")
+        logging.error(response.text)
+        
+def assign_app_role(auth_config, params, token=False):
+
+    logging.info(f"Running the assign_app_role technique")
+    service_principal_id = params.get('service_principal_id')
+    resource_id = params.get('resource_id')
+    app_role_id = params.get('app_role_id')
+
+    access_token = token['access_token']
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+
+    body = {
+        "principalId": service_principal_id,
+        "resourceId": resource_id,
+        "appRoleId": app_role_id
+    }
+
+    graph_endpoint = f"https://graph.microsoft.com/v1.0/servicePrincipals/{service_principal_id}/appRoleAssignments"
+    short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
+    logging.info(f"Submitting POST request to {short_endpoint}")
+
+    response = requests.post(graph_endpoint, headers = headers, json=body)
+    if response.status_code == 201:
+        logging.info(f"201 Created - App Role assigned succesfully to {service_principal_id}")
+        
+    else:
+
+        logging.error(f"Failed to assign app role with status code {response.status_code}")
+        print (response.json())
+
+
+def assign_app_role2(auth_config, params, token=False):
+
+    logging.info(f"Running the assign_app_role technique")
+    service_principal_id = params.get('service_principal_id')
+    resource_id = params.get('resource_id')
+    app_role_ids = params.get('app_role_id')  # Can be a single value or a list
+    
+    access_token = token['access_token']
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+
+    # Handle both single and multiple app roles
+    if not isinstance(app_role_ids, list):
+        app_role_ids = [app_role_ids]
+
+    for app_role_id in app_role_ids:
+        body = {
+            "principalId": service_principal_id,
+            "resourceId": resource_id,
+            "appRoleId": app_role_id
+        }
+
+        graph_endpoint = f"https://graph.microsoft.com/v1.0/servicePrincipals/{service_principal_id}/appRoleAssignments"
+        short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
+        logging.info(f"Submitting POST request to {short_endpoint} for app role {app_role_id}")
+
+        response = requests.post(graph_endpoint, headers=headers, json=body)
+
+        if response.status_code == 201:
+            logging.info(f"201 Created - App Role {app_role_id} assigned successfully to {service_principal_id}")
+        else:
+            logging.error(f"Failed to assign app role {app_role_id} with status code {response.status_code}")
+            logging.error(response.json())
+        
+        
+def create_user_graph(auth_config, params, token=False):
+
+    logging.info("Running the create_user technique using the Graph API")
+
+    if not token :
+        token = get_ms_token(auth_config, params['auth_method'], 'https://graph.microsoft.com/.default')
+
+    # API Endpoint
+    graph_endpoint = "https://graph.microsoft.com/v1.0/users"
+
+    # Access token
+    access_token = token['access_token']
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+    mail_nick_name = params['user_principal_name'].split('@')[0]
+
+    # User details payload
+    user_payload = {
+        "accountEnabled": True,
+        "displayName": params['display_name'],
+        "mailNickname": mail_nick_name,
+        "userPrincipalName": params['user_principal_name'],
+        "passwordProfile": {
+            "forceChangePasswordNextSignIn": False,
+            "password": params['password']
+        }
+    }
+
+    short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
+    logging.info(f"Submitting POST request to {short_endpoint}")
+
+    # Send POST request to create the user
+    response = requests.post(graph_endpoint, headers=headers, json=user_payload)
+
+    if response.status_code == 201:
+        logging.info("201 Created - User created successfully.")
+
+    else:
+        logging.error(f"Failed to create user with status code: {response.status_code}")
+        print(response.json())
+    
+    
+def assign_entra_role_graph(auth_config, params, token=False):
+
+    logging.info("Running the assign_entra_role technique using the Graph API")
+    
+    principal_id = params.get('principal_id', 0)
+    upn = params.get('user_principal_name', "")
+    role_id = params['role_id']
+    
+    if principal_id == 0:
+        principal_id =  get_user_object_guid(auth_config, params, upn, token)
+    
+    if not token:
+        token = get_ms_token(auth_config, params['auth_method'], 'https://graph.microsoft.com/.default')
+
+
+    access_token = token['access_token']
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+
+    body = {
+        "principalId": principal_id,
+        "roleDefinitionId": role_id,
+        "directoryScopeId": "/"
+    }
+
+    graph_endpoint = f"https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments"
+    short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
+    logging.info(f"Submitting POST request to {short_endpoint}")
+
+    response = requests.post(graph_endpoint, headers = headers, json=body)
+    if response.status_code == 201:
+
+        logging.info("201 Created - Entra Role assiggned succesfully.")
+
+
+    else:
+        #logging.info(f"[*] {response.json() }")
+        #error_description = response.json().get('error_description', '')
+        logging.error(f"Failed to assign Entra role with status code: {response.status_code}")
+        print(response.json())
+
+def get_user_object_guid(auth_config, params, upn, token=False):
+
+    #upn = params ['user_principal_name']
+
+    logging.info(f"Retrieving Object GUID for UPN: {upn}")
+
+    # Obtain token if not provided
+    if not token:
+        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
+
+    access_token = token['access_token']
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+
+    # Graph API endpoint to retrieve the user by UPN
+    graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{upn}'
+    short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
+    logging.info(f"Submitting GET request to {short_endpoint}")
+
+    # Make the GET request
+    response = requests.get(graph_endpoint, headers=headers)
+
+    # Process the response
+    if response.status_code == 200:
+        user_data = response.json()
+        object_id = user_data.get('id')
+        logging.info(f"Successfully retrieved Object GUID for UPN {upn}: {object_id}")
+        return object_id
+    elif response.status_code == 404:
+        logging.error(f"User with UPN {upn} not found.")
+    else:
+        logging.error(f"Failed to retrieve Object GUID for UPN {upn}. Status code: {response.status_code}")
+        logging.error(response.text)
+
+    return None
+        

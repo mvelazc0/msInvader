@@ -8,7 +8,7 @@ import argparse
 
 ### Other
 
-
+tokens = {}
 banner = """
 
                 _____                     _           
@@ -72,6 +72,47 @@ def setup_logging(level):
     root_logger.setLevel(level)
 
 
+def add_token(session_name, scope, access_token, refresh_token, expiry):
+
+    if session_name not in tokens:
+        tokens[session_name] = {}
+    tokens[session_name][scope] = {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "expiry": expiry
+    }
+
+def get_token(session_name, scope):
+
+    session_tokens = tokens.get(session_name)
+    if not session_tokens:
+        return None  
+
+    token_info = session_tokens.get(scope)
+    if token_info:
+        #if token_info["expiry"] > time.time():
+        return token_info["access_token"]  
+        #else:
+            # Token expired; refresh it
+        #    return refresh_access_token(session_name, scope, token_info["refresh_token"])
+    return None
+
+#TODO: Need to re-implement this
+def refresh_tokens(config, session_name):
+
+        logging.info("Refresing client credential tokens after assign_app_role")
+
+        session_details= config['authentication']['sessions'][session_name]
+    
+        graph_token = get_ms_token(config['authentication'], session_details, graph_scope)
+        add_token(session_name, "graph", graph_token['access_token'], "0", "0")
+        
+        ews_token = get_ms_token(config['authentication'], session_details, ews_scope)
+        add_token(session_name, "ews", ews_token['access_token'], "0", "0")
+
+        rest_token = get_ms_token(config['authentication'], session_details, rest_scope)
+        add_token(session_name, "ews", rest_token['access_token'], "0", "0")    
+
 def main():
 
     setup_logging(logging.INFO)
@@ -88,132 +129,208 @@ def main():
         config_path = 'config.yml'    
     
     config = load_config(config_path)
-    enabled_techniques = [tech for tech in config['techniques'] if tech['enabled']]
-    methods = list(set([tech['parameters']['access_method'] for tech in enabled_techniques]))
 
-    graph_token = {'access_token': None, 'refresh_token': None}
-    ews_token = {'access_token': None, 'refresh_token': None}
-    rest_token = {'access_token': None, 'refresh_token': None}
-
-    logging.info(f"Identified {len(enabled_techniques)} enabled technique(s) on configuration file")
-
-    if 'auth_method ' in config['authentication'].keys():
-        logging.info(f"Obtaining authentication tokens required to execute simulations")
-        for method in methods:
-            if method == 'rest':
-                rest_token = get_ms_token(config['authentication'], config['authentication']['auth_method'], rest_scope)
+    for session_name, session_details in config["authentication"]["sessions"].items():
+        
+        if session_details['type'] != 'client_credentials':
+            graph_token = get_ms_token(config['authentication'], session_details, graph_scope)
+            add_token(session_name, "graph", graph_token['access_token'], graph_token['refresh_token'], "0")
             
-            elif method == 'ews':
-                ews_token = get_ms_token(config['authentication'], config['authentication']['auth_method'], ews_scope)
+            ews_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], ews_scope)
+            add_token(session_name, "ews", ews_token['access_token'], ews_token['refresh_token'], "0")
 
-            elif method == 'graph':
-                graph_token= get_ms_token(config['authentication'], config['authentication']['auth_method'], graph_scope)
-                #ews_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], ews_scope)
+            rest_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], rest_scope)
+            add_token(session_name, "rest", rest_token['access_token'], rest_token['refresh_token'], "0")        
+        
+        else:
+            graph_token = get_ms_token(config['authentication'], session_details, graph_scope)
+            add_token(session_name, "graph", graph_token['access_token'], "0", "0")
+            
+            ews_token = get_ms_token(config['authentication'], session_details, ews_scope)
+            add_token(session_name, "ews", ews_token['access_token'], "0", "0")
+ 
+            rest_token = get_ms_token(config['authentication'], session_details, rest_scope)
+            add_token(session_name, "ews", rest_token['access_token'], "0", "0")
+            
+        
+    logging.info("************* Starting playbook execution *************")
 
-    logging.info("************* Starting technique execution *************")
+    for playbook in config['playbooks']:
+        
+        playbook_name = playbook.get('name', 'Unnamed Playbook')
+        sleep = playbook.get('sleep', 0)
+        jitter = playbook.get('jitter', 0)
+        
+        logging.info(f"Processing playbook: {playbook_name}")
+        
+
+        enabled_techniques = [tech for tech in playbook['techniques'] if tech.get('enabled', False)]
+        logging.info(f"Identified {len(enabled_techniques)} enabled technique(s) in playbook '{playbook_name}'")
+        
     
-    for technique in enabled_techniques:
+        #for technique in enabled_techniques:
+        for index, technique in enumerate(enabled_techniques):
 
-        if technique['technique'] == 'search_mailbox':
+            technique_name = technique['technique']
+            parameters = technique['parameters']
+            session_name = parameters.get('session', 'nosession')
+            #session_name = parameters['session']
+            access_method = parameters['access_method']
+            parameters['ews_impersonation'] = False
 
-            if technique['parameters']['access_method'] == 'graph':
-
-                search_mailbox_graph(config['authentication'], technique['parameters'], graph_token['access_token'])
-
-        if technique['technique'] == 'search_onedrive':
-
-            if technique['parameters']['access_method'] == 'graph':
-
-                search_onedrive_graph(config['authentication'], technique['parameters'], graph_token['access_token'])
-
-        if technique['technique'] == 'read_email':
-
-            if technique['parameters']['access_method'] == 'graph':
-
-                read_email_graph(config['authentication'], technique['parameters'], graph_token['access_token'])
-
-            elif technique['parameters']['access_method'] == 'ews':
-
-                read_email_ews(config['authentication'], technique['parameters'], ews_token['access_token'])
             
-            elif technique['parameters']['access_method'] == 'rest':
-                # Exchange online management does not support Get-Message on M365
-                logging.error("Technique method not supported")
+            if session_name != 'nosession' and config['authentication']['sessions'][session_name]['type'] == 'client_credentials':
+                parameters['ews_impersonation'] = True
+                
+            if technique_name == 'search_email':
 
-        elif technique['technique'] == 'create_rule':
+                if access_method == 'graph':
+                    #W
+                    search_email_graph(config['authentication'], parameters, tokens[session_name]['graph'])
 
-            if technique['parameters']['access_method'] == 'graph':
+            if technique_name == 'search_onedrive':
+                
+                if access_method == 'graph':
+                    #W
+                    search_onedrive_graph(config['authentication'], parameters, tokens[session_name]['graph'])
 
-                create_rule_graph(config['authentication'], technique['parameters'], graph_token['acesss_token'])
+            if technique_name == 'read_email':
+                
+                if access_method == 'graph':
+                    #W
+                    read_email_graph(config['authentication'], parameters, tokens[session_name]['graph'])
 
-            elif technique['parameters']['access_method'] == 'ews':
+                elif access_method == 'ews':
+                    #W
+                    read_email_ews2(config['authentication'], parameters, tokens[session_name]['ews'])
+                
+                #elif access_method == 'rest':
+                    # Exchange online management does not support Get-Message on M365
+                #    logging.error("Technique method not supported")
 
-                create_rule_ews(config['authentication'], technique['parameters'], ews_token['access_token'])
+            elif technique_name == 'create_rule':
 
-            elif technique['parameters']['access_method'] == 'rest':
+                if access_method == 'graph':
+                    #NW
+                    create_rule_graph(config['authentication'], parameters, tokens[session_name]['graph'])
 
-                create_rule_rest(config['authentication'], technique['parameters'], rest_token['access_token'])
+                if access_method == 'ews':
+                    #W
+                    create_rule_ews2(config['authentication'], parameters, tokens[session_name]['ews'])
 
-        elif technique['technique'] == 'enable_email_forwarding':
+                elif access_method == 'rest':
+                    #W
+                    create_rule_rest(config['authentication'], parameters, tokens[session_name]['rest'])
 
-            if technique['parameters']['access_method'] == 'rest':
+            elif technique_name == 'enable_email_forwarding':
 
-                enable_email_forwarding_rest(config['authentication'], technique['parameters'], rest_token['access_token'])      
+                if access_method == 'rest':
+                    #W
+                    enable_email_forwarding_rest(config['authentication'], parameters, tokens[session_name]['rest'])      
 
-        elif technique['technique'] == 'add_folder_permission':
+            elif technique_name == 'add_folder_permission':
 
-            if technique['parameters']['access_method'] == 'rest':
+                if access_method == 'rest':
+                    #W
+                    modify_folder_permission_rest(config['authentication'], parameters, tokens[session_name]['rest'])      
 
-                modify_folder_permission_rest(config['authentication'], technique['parameters'], rest_token['access_token'])      
+                if access_method == 'ews':
+                    #W
+                    modify_folder_permission_ews(config['authentication'], parameters, tokens[session_name]['ews'])      
 
-            if technique['parameters']['access_method'] == 'ews':
-    
-                modify_folder_permission_ews(config['authentication'], technique['parameters'], ews_token['access_token'])      
+            elif technique_name == 'add_mailbox_delegation':
 
-        elif technique['technique'] == 'add_mailbox_delegation':
+                if access_method == 'rest':
+                    #W. 
+                    # Requires exchange admin
+                    add_mailbox_delegation_rest(config['authentication'], parameters, tokens[session_name]['rest'])      
 
-            if technique['parameters']['access_method'] == 'rest':
+            elif technique_name == 'run_compliance_search':
 
-                add_mailbox_delegation_rest(config['authentication'], technique['parameters'], rest_token['access_token'])      
+                if access_method == 'rest':
+                    #NW
+                    # Requires exchange admin
+                    run_compliance_search_rest(config['authentication'], parameters, tokens[session_name]['rest'])      
 
-        elif technique['technique'] == 'run_compliance_search':
+            elif technique_name == 'create_mailflow_rule':
 
-            if technique['parameters']['access_method'] == 'rest':
+                if access_method == 'rest':
+                    #W
+                    create_mailflow_rule_rest(config['authentication'], parameters, tokens[session_name]['rest'])      
 
-                run_compliance_search_rest(config['authentication'], technique['parameters'], rest_token['access_token'])      
+            elif technique_name == 'password_spray':
+                #W
+                password_spray(technique['parameters'])
 
-        elif technique['technique'] == 'create_mailflow_rule':
+            elif technique_name == 'add_application_secret':
+                #W
+                add_application_secret_graph(config['authentication'], parameters, tokens[session_name]['graph'])
 
-            if technique['parameters']['access_method'] == 'rest':
+            elif technique_name == 'add_service_principal':
+                
+                add_service_principal(config['authentication'], parameters, tokens[session_name]['graph'])
 
-                create_mailflow_rule_rest(config['authentication'], technique['parameters'], rest_token['access_token'])      
+            elif technique_name == 'admin_consent':
+                
+                admin_consent_graph(config['authentication'], parameters, tokens[session_name]['graph'])
 
-        elif technique['technique'] == 'password_spray':
+            elif technique_name == 'create_app':
+                
+                app_id = create_application_registration(config['authentication'], technique['parameters'], tokens[session_name]['graph'])
+                app_id = app_id.get('appId')
+                technique['parameters']['app_id']= app_id
+                add_service_principal(config['authentication'],parameters, tokens[session_name]['graph'])
 
-            password_spray(technique['parameters'])
+            elif technique_name == 'send_mail':
+                ##
+                send_email_graph(config['authentication'], parameters, tokens[session_name]['graph'])  
+                
 
-        elif technique['technique'] == 'add_application_secret':
-            
-            add_application_secret_graph(config['authentication'], technique['parameters'], graph_token['access_token'])
+            elif technique_name == 'enumerate_users':
+                #W
+                enumerate_entities(config['authentication'], parameters, "users", tokens[session_name]['graph'])                  
 
-        elif technique['technique'] == 'add_service_principal':
-            
-            add_service_principal(config['authentication'], technique['parameters'], graph_token['access_token'])
+            elif technique_name == 'enumerate_groups':
+                #W
+                enumerate_entities(config['authentication'], parameters, "groups", tokens[session_name]['graph'])    
+                
+            elif technique_name == 'enumerate_applications':
+                #W
+                enumerate_entities(config['authentication'], parameters, "applications", tokens[session_name]['graph'])    
+                
+            elif technique_name == 'enumerate_service_principals':
+                #W
+                enumerate_entities(config['authentication'], parameters, "service_principals", tokens[session_name]['graph']) 
 
-        elif technique['technique'] == 'admin_consent':
-            
-            admin_consent_graph(config['authentication'], technique['parameters'], graph_token['access_token'])
+            elif technique_name == 'enumerate_directory_roles':
+                #W
+                enumerate_entities(config['authentication'], parameters, "directory_roles", tokens[session_name]['graph']) 
 
-        elif technique['technique'] == 'create_app':
-            
-            app_id = create_application_registration(config['authentication'], technique['parameters'], graph_token['access_token'])
-            app_id = app_id.get('appId')
-            technique['parameters']['app_id']= app_id
-            add_service_principal(config['authentication'],technique['parameters'], graph_token['access_token'])
+            elif technique_name == 'change_password':
+                #W
+                change_user_password(config['authentication'], parameters, tokens[session_name]['graph']) 
+  
+            elif technique_name == 'assign_app_role':
+                #W
+                assign_app_role2(config['authentication'], parameters, tokens[session_name]['graph']) 
+                time.sleep(20)
+                refresh_tokens(config, session_name )
 
-        elif technique['technique'] == 'send_mail':
-            
-            send_email_graph(config['authentication'], technique['parameters'], graph_token['access_token'])
+            elif technique_name == 'create_user':
+                #W
+                create_user_graph(config['authentication'], parameters, tokens[session_name]['graph']) 
+
+            elif technique_name == 'assign_entra_role':
+                #W
+                assign_entra_role_graph(config['authentication'], parameters, tokens[session_name]['graph']) 
+                
+            # Apply sleep only if this is not the last technique
+            if index < len(enabled_techniques) - 1:
+                if sleep is not None:
+                    if jitter is not None:
+                        time.sleep(sleep + random.uniform(0, jitter))
+                    else:
+                        time.sleep(sleep)
 
     logging.info("************* Finished technique execution *************")
 
