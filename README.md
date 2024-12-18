@@ -5,12 +5,12 @@
     <img src="img/msInvader.png" alt="msInvader logo" style="width: 30%; height: 35%;">
 </div>
 <br>
-msInvader is an adversary simulation tool built for blue teams, designed to simulate adversary techniques within M365 and Azure environments. Its purpose is to generate attack telemetry that can help teams improve their detection and response posture. <br> <br>
-To facilitate realistic simulations, msInvader implements multiple authentication mechanisms that mirror different attack scenarios.
-It includes support for simulating scenarios where an attacker gains access to a compromised user account, leveraging the resource owner password flow and the device authorization flow.
-These methods enable msInvader to obtain user tokens, simulating scenarios such as the compromise of user credentials or a successful MFA bypass like an adversary-in-the-middle (AiTM) attack. Additionally, msInvader can replicate conditions involving compromised service principals by supporting the client credentials OAuth flow.<br><br>
+msInvader is an adversary simulation tool designed for blue teams to simulate real-world attack techniques within M365 and Azure environments. By generating realistic attack telemetry, msInvader empowers detection engineers, SOC analysts, and threat hunters to assess, enhance, and strengthen their detection and response capabilities.<br><br>
+msInvader supports simulating techniques in two common attack scenarios: a compromised user account or a compromised service principal. These scenarios reflect typical post-compromise situations, enabling teams to evaluate and improve their response to such threats.
 
-Once authenticated, msInvader is capable of interacting with Exchange Online through three distinct methods: the Graph API, Exchange Web Services (EWS), and the REST API utilized by the Exchange Online PowerShell module. This support enables msInvader to comprehensively simulate attack techniques, providing blue teams with the flexibility to simulate multiple scenarios. 
+For user account scenarios, msInvader uses the [resource owner password](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth-ropc) and [device authorization](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-device-code) OAuth flows to obtain tokens, simulating attacks such as credential compromise (e.g., phishing or password spraying attacks) or MFA bypass (e.g., adversary-in-the-middle (AiTM) or token theft attacks). For compromised service principals, it leverages the [client credentials](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-client-creds-grant-flow) OAuth flow to replicate unauthorized application access.
+
+Once authenticated, msInvader interacts with Exchange Online using three methods: the Graph API, Exchange Web Services (EWS), and the REST API used by the Exchange Online PowerShell module. This flexibility allows blue teams to simulate a wide range of attack techniques across multiple scenarios.
 
 ## Documentation
 
