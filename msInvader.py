@@ -334,6 +334,10 @@ def main():
             elif technique_name == 'list_key_vaults':
                 
                 list_key_vaults(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+
+            elif technique_name == 'list_keyvault_items':
+                
+                list_keyvault_items(config['authentication'], parameters, tokens[session_name]['keyvault']) 
                 
             # Apply sleep only if this is not the last technique
             if index < len(enabled_techniques) - 1:
