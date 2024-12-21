@@ -2,6 +2,7 @@ import yaml
 from src.ews_client import *
 from src.graph_client import *
 from src.rest_client import *
+from src.keyvault_client import *
 from src.auth import *
 import logging
 import argparse
@@ -141,6 +142,10 @@ def main():
 
             rest_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], rest_scope)
             add_token(session_name, "rest", rest_token['access_token'], rest_token['refresh_token'], "0")        
+            
+            keyvault_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], keyvault_scope)
+            add_token(session_name, "keyvault", keyvault_token['access_token'], keyvault_token['refresh_token'], "0")        
+            #print(keyvault_token)
         
         else:
             graph_token = get_ms_token(config['authentication'], session_details, graph_scope)
@@ -151,6 +156,8 @@ def main():
  
             rest_token = get_ms_token(config['authentication'], session_details, rest_scope)
             add_token(session_name, "ews", rest_token['access_token'], "0", "0")
+            
+
             
         
     logging.info("************* Starting playbook execution *************")
@@ -323,6 +330,10 @@ def main():
             elif technique_name == 'assign_entra_role':
                 #W
                 assign_entra_role_graph(config['authentication'], parameters, tokens[session_name]['graph']) 
+
+            elif technique_name == 'list_key_vaults':
+                
+                list_key_vaults(config['authentication'], parameters, tokens[session_name]['keyvault']) 
                 
             # Apply sleep only if this is not the last technique
             if index < len(enabled_techniques) - 1:
