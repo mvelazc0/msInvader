@@ -80,7 +80,7 @@ def list_keyvault_items(auth_config, params, token=False):
             response_json = response.json()
             #print(response_json)
             items = response_json.get("value", [])
-            # Exclude managed secrets if listing secrets
+            # Exclude managed secrets if listing secrets or keys
             if current_type in ["secrets", "keys"]:
                 items = [item for item in items if not item.get("managed", False)]
             total_items = len(items)
@@ -90,3 +90,46 @@ def list_keyvault_items(auth_config, params, token=False):
             logging.error(response.json())
 
     logging.info("List Key Vault Items operation finished")
+
+def access_key_vault_item(auth_config, params, token=False):
+    
+    logging.info("Running the access_key_vault_item technique")
+
+    keyvault_url = params.get('keyvault_url', "")
+    item_type = params.get('item_type', "").lower()  # 'secret', 'key', 'certificate'
+    item_name = params.get('item_name', "")
+    version = params.get('version', None)  # Optional version of the item
+
+    if not keyvault_url or not item_type or not item_name:
+        logging.error("Key Vault URL, item_type, and item_name are required.")
+        return
+
+    if item_type not in ['secret', 'key', 'certificate']:
+        logging.error(f"Invalid item_type: {item_type}. Must be 'secret', 'key', or 'certificate'.")
+        return
+
+    # Construct the base URL for the item
+    endpoint = f"{keyvault_url}/{item_type}s/{item_name}"
+    if version:
+        endpoint += f"/{version}"
+    query_params = {"api-version": "7.3"}
+
+    access_token = token["access_token"]
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+
+    logging.info(f"Submitting GET request to {endpoint}")
+
+    response = requests.get(endpoint, headers=headers, params=query_params)
+
+    if response.status_code == 200:
+        logging.info(f"200 OK - Successfully accessed Key Vault {item_type}: {item_name}")
+        print(response.json())
+        #logging.debug(response.json())  # Optionally log the full response for debugging
+    else:
+        logging.error(f"Failed to access Key Vault {item_type} with status code: {response.status_code}")
+        logging.error(response.json())
+
+    logging.info(f"Access Key Vault {item_type.capitalize()} operation finished")
