@@ -126,7 +126,7 @@ def access_key_vault_item(auth_config, params, token=False):
 
     if response.status_code == 200:
         logging.info(f"200 OK - Successfully accessed Key Vault {item_type}: {item_name}")
-        print(response.json())
+        #print(response.json())
         #logging.debug(response.json())  # Optionally log the full response for debugging
     else:
         logging.error(f"Failed to access Key Vault {item_type} with status code: {response.status_code}")
