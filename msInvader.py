@@ -3,6 +3,7 @@ from src.ews_client import *
 from src.graph_client import *
 from src.rest_client import *
 from src.keyvault_client import *
+from src.vm_client import *
 from src.auth import *
 import logging
 import argparse
@@ -342,6 +343,10 @@ def main():
             elif technique_name == 'access_key_vault_item':
                 
                 access_key_vault_item(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+
+            elif technique_name == 'execute_command':
+                
+                vm_execute_command(config['authentication'], parameters, tokens[session_name]['keyvault']) 
                 
             # Apply sleep only if this is not the last technique
             if index < len(enabled_techniques) - 1:

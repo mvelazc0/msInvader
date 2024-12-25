@@ -4,8 +4,8 @@ import logging
 import random
 
 
-#keyvault_scope = "https://management.azure.com/.default"
-keyvault_scope = "https://vault.azure.net/.default"
+keyvault_scope = "https://management.azure.com/.default"
+#keyvault_scope = "https://vault.azure.net/.default"
 
 
 def list_key_vaults(auth_config, params, token=False):

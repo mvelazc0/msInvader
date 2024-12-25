@@ -54,6 +54,8 @@ def vm_execute_command(auth_config, params, token=False):
         while elapsed_time < timeout:
             logging.info(f"Polling operation status (Elapsed: {elapsed_time}s)...")
             status_response = requests.get(operation_url, headers=headers)
+            output = status_response.json().get("properties", {}).get("output", "No output available")
+
 
             if status_response.status_code == 200:
                 operation_status = status_response.json().get("status", "").lower()
@@ -61,6 +63,7 @@ def vm_execute_command(auth_config, params, token=False):
                 if operation_status == "succeeded":
                     logging.info("Command executed successfully.")
                     logging.info("VM Command Execution: Finished with SUCCESS")
+                    logging.info(f"Command Output: {output}")
                     return
                 elif operation_status == "failed":
                     logging.error("Command execution failed.")
