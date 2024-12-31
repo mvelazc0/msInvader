@@ -140,10 +140,10 @@ def add_keyvault_access_policy(auth_config, params, token=False):
     subscription_id = params.get("subscription_id", "")
     resource_group = params.get("resource_group", "")
     keyvault_name = params.get("keyvault_name", "")
-    user_object_id = params.get("user_principal_object_id", "")
+    user_principal_object_id = params.get("user_principal_object_id", "")
     tenant_id = params.get("tenant_id", "")
 
-    if not subscription_id or not resource_group or not keyvault_name or not user_object_id or not tenant_id:
+    if not subscription_id or not resource_group or not keyvault_name or not user_principal_object_id or not tenant_id:
         logging.error("Missing required parameters. Ensure all fields are provided.")
         return
 
@@ -157,7 +157,7 @@ def add_keyvault_access_policy(auth_config, params, token=False):
             "accessPolicies": [
                 {
                     "tenantId": tenant_id,
-                    "objectId": user_object_id,
+                    "objectId": user_principal_object_id,
                     "permissions": {
                         "secrets": ["get", "list"],
                         "keys": ["get", "list"],
