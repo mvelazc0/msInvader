@@ -133,3 +133,57 @@ def access_key_vault_item(auth_config, params, token=False):
         logging.error(response.json())
 
     logging.info(f"Access Key Vault {item_type.capitalize()} operation finished")
+
+def add_keyvault_access_policy(auth_config, params, token=False):
+    logging.info("Running the keyvault_add_access_policy technique")
+
+    subscription_id = params.get("subscription_id", "")
+    resource_group = params.get("resource_group", "")
+    keyvault_name = params.get("keyvault_name", "")
+    user_object_id = params.get("user_principal_object_id", "")
+    tenant_id = params.get("tenant_id", "")
+
+    if not subscription_id or not resource_group or not keyvault_name or not user_object_id or not tenant_id:
+        logging.error("Missing required parameters. Ensure all fields are provided.")
+        return
+
+    endpoint = (
+        f"https://management.azure.com/subscriptions/{subscription_id}/resourceGroups/{resource_group}/"
+        f"providers/Microsoft.KeyVault/vaults/{keyvault_name}/accessPolicies/add?api-version=2022-07-01"
+    )
+
+    payload = {
+        "properties": {
+            "accessPolicies": [
+                {
+                    "tenantId": tenant_id,
+                    "objectId": user_object_id,
+                    "permissions": {
+                        "secrets": ["get", "list"],
+                        "keys": ["get", "list"],
+                        "certificates": ["get", "list"]
+                    }
+                }
+            ]
+        }
+    }
+
+    access_token = token["access_token"]
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+
+    logging.info(f"Submitting PUT request to {endpoint}")
+    response = requests.put(endpoint, headers=headers, json=payload)
+
+    if response.status_code in [200, 201]:
+        logging.info("Access policy successfully added to the Key Vault.")
+    else:
+        try:
+            error_message = response.json().get("error", {}).get("message", "Unknown error.")
+        except ValueError:
+            error_message = response.text
+        logging.error(f"Failed to add access policy: {error_message}")
+
+    logging.info("Key Vault Access Policy Addition: Finished")
