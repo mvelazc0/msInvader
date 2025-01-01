@@ -351,6 +351,10 @@ def main():
             elif technique_name == 'execute_command':
                 
                 vm_execute_command(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+
+            elif technique_name == 'list_extensions':
+                
+                vm_list_extensions(config['authentication'], parameters, tokens[session_name]['keyvault'])                 
                 
             # Apply sleep only if this is not the last technique
             if index < len(enabled_techniques) - 1:

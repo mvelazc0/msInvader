@@ -5,6 +5,7 @@ import random
 
 
 def vm_execute_command(auth_config, params, token=False):
+    
     logging.info("Running the vm_execute_command technique")
 
     subscription_id = params.get("subscription_id", "")
@@ -88,3 +89,48 @@ def vm_execute_command(auth_config, params, token=False):
         error_message = response.json().get("error", {}).get("message", "Unknown error.")
         logging.error(f"Command execution failed: {error_message}")
         logging.info("VM Command Execution: Finished with FAILURE")
+
+
+def vm_list_extensions(auth_config, params, token=False):
+    
+    logging.info("Running the vm_list_extensions technique")
+
+    subscription_id = params.get("subscription_id", "")
+    resource_group = params.get("resource_group", "")
+    vm_name = params.get("vm_name", "")
+
+    if not subscription_id or not resource_group or not vm_name:
+        logging.error("Missing required parameters. Ensure subscription_id, resource_group, and vm_name are provided.")
+        return
+
+    endpoint = (
+        f"https://management.azure.com/subscriptions/{subscription_id}/resourceGroups/{resource_group}/"
+        f"providers/Microsoft.Compute/virtualMachines/{vm_name}/extensions?api-version=2022-08-01"
+    )
+
+    access_token = token["access_token"]
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+
+    logging.info(f"Submitting GET request to {endpoint}")
+    response = requests.get(endpoint, headers=headers)
+
+    if response.status_code == 200:
+        logging.info("VM extensions successfully retrieved.")
+        extensions = response.json().get("value", [])
+        for ext in extensions:
+            logging.info(f"Extension Found: {ext.get('name')} ({ext.get('type')})")
+            logging.info(f"Publisher: {ext.get('properties', {}).get('publisher')}")
+            logging.info(f"TypeHandlerVersion: {ext.get('properties', {}).get('typeHandlerVersion')}")
+            logging.info(f"ProvisioningState: {ext.get('properties', {}).get('provisioningState')}")
+    else:
+        try:
+            error_message = response.json().get("error", {}).get("message", "Unknown error.")
+        except ValueError:
+            error_message = response.text
+        logging.error(f"Failed to list VM extensions: {error_message}")
+
+    logging.info("VM Extension Listing: Finished")
+        
