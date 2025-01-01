@@ -348,6 +348,10 @@ def main():
                 
                 add_keyvault_access_policy(config['authentication'], parameters, tokens[session_name]['keyvault']) 
 
+            elif technique_name == 'list_keyvault_access_policies':
+                
+                list_keyvault_access_policies(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+
             elif technique_name == 'execute_command':
                 
                 vm_execute_command(config['authentication'], parameters, tokens[session_name]['keyvault']) 

@@ -122,9 +122,9 @@ def vm_list_extensions(auth_config, params, token=False):
         extensions = response.json().get("value", [])
         for ext in extensions:
             logging.info(f"Extension Found: {ext.get('name')} ({ext.get('type')})")
-            logging.info(f"Publisher: {ext.get('properties', {}).get('publisher')}")
-            logging.info(f"TypeHandlerVersion: {ext.get('properties', {}).get('typeHandlerVersion')}")
-            logging.info(f"ProvisioningState: {ext.get('properties', {}).get('provisioningState')}")
+            #logging.info(f"Publisher: {ext.get('properties', {}).get('publisher')}")
+            #logging.info(f"TypeHandlerVersion: {ext.get('properties', {}).get('typeHandlerVersion')}")
+            #logging.info(f"ProvisioningState: {ext.get('properties', {}).get('provisioningState')}")
     else:
         try:
             error_message = response.json().get("error", {}).get("message", "Unknown error.")

@@ -187,3 +187,52 @@ def add_keyvault_access_policy(auth_config, params, token=False):
         logging.error(f"Failed to add access policy: {error_message}")
 
     logging.info("Key Vault Access Policy Addition: Finished")
+
+
+def list_keyvault_access_policies(auth_config, params, token=False):
+    
+    logging.info("Running the keyvault_list_access_policies technique")
+
+    subscription_id = params.get("subscription_id", "")
+    resource_group = params.get("resource_group", "")
+    keyvault_name = params.get("keyvault_name", "")
+
+    if not subscription_id or not resource_group or not keyvault_name:
+        logging.error("Missing required parameters. Ensure subscription_id, resource_group, and keyvault_name are provided.")
+        return
+
+    endpoint = (
+        f"https://management.azure.com/subscriptions/{subscription_id}/resourceGroups/{resource_group}/"
+        f"providers/Microsoft.KeyVault/vaults/{keyvault_name}?api-version=2022-07-01"
+    )
+
+    access_token = token["access_token"]
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+
+    logging.info(f"Submitting GET request to {endpoint}")
+    response = requests.get(endpoint, headers=headers)
+
+    if response.status_code == 200:
+        logging.info("Successfully retrieved Key Vault access policies.")
+        keyvault_properties = response.json().get("properties", {})
+        access_policies = keyvault_properties.get("accessPolicies", [])
+        for policy in access_policies:
+            logging.info(f"Access Policy:")
+            #logging.info(f"  Tenant ID: {policy.get('tenantId')}")
+            logging.info(f"  Object ID: {policy.get('objectId')}")
+            #permissions = policy.get("permissions", {})
+            #logging.info(f"  Permissions:")
+            #logging.info(f"    Secrets: {permissions.get('secrets', [])}")
+            #logging.info(f"    Keys: {permissions.get('keys', [])}")
+            #logging.info(f"    Certificates: {permissions.get('certificates', [])}")
+    else:
+        try:
+            error_message = response.json().get("error", {}).get("message", "Unknown error.")
+        except ValueError:
+            error_message = response.text
+        logging.error(f"Failed to retrieve Key Vault access policies: {error_message}")
+
+    logging.info("Key Vault Access Policies Listing: Finished")
