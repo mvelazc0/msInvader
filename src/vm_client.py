@@ -133,4 +133,126 @@ def vm_list_extensions(auth_config, params, token=False):
         logging.error(f"Failed to list VM extensions: {error_message}")
 
     logging.info("VM Extension Listing: Finished")
-        
+
+
+def vm_reset_password(auth_config, params, token=False):
+    
+    logging.info("Running the vm_reset_password technique")
+
+    subscription_id = params.get("subscription_id", "")
+    resource_group = params.get("resource_group", "")
+    location = params.get("location", "")
+    vm_name = params.get("vm_name", "")
+    username = params.get("username", "")
+    new_password = params.get("new_password", "")
+    os_type = params.get("os_type", "").lower()
+
+    if not subscription_id or not resource_group or not vm_name or not username or not new_password or not os_type:
+        logging.error("Missing required parameters. Ensure all fields are provided.")
+        return
+
+    # Define common components
+    endpoint_base = (
+        f"https://management.azure.com/subscriptions/{subscription_id}/resourceGroups/{resource_group}/"
+        f"providers/Microsoft.Compute/virtualMachines/{vm_name}/extensions"
+    )
+
+    headers = {
+        "Authorization": f"Bearer {token['access_token']}",
+        "Content-Type": "application/json"
+    }
+
+    # OS-specific configurations
+    if os_type == "linux":
+        extension_name = "VMAccessForLinux"
+        logging.info(f"Linux VM detected. Preparing to reset password for user: {username}")
+        payload = {
+            "location": location,
+            "properties": {
+                "publisher": "Microsoft.OSTCExtensions",
+                "type": "VMAccessForLinux",
+                "typeHandlerVersion": "1.5",
+                "autoUpgradeMinorVersion": True,
+                "protectedSettings": {
+                    "username": username,
+                    "password": new_password
+                }
+            }
+        }
+    elif os_type == "windows":
+        extension_name = "myVMAccess"
+        logging.info(f"Windows VM detected. Preparing to reset password for user: {username}")
+        payload = {
+            "location": location,
+            "properties": {
+                "publisher": "Microsoft.Compute",
+                "type": "VMAccessAgent",
+                "typeHandlerVersion": "2.0",
+                "autoUpgradeMinorVersion": True,
+                "settings": {
+                    "UserName": username
+                },
+                "protectedSettings": {
+                    "Password": new_password
+                }
+            }
+        }
+    else:
+        logging.error(f"Unsupported OS type: {os_type}. Must be 'linux' or 'windows'.")
+        return
+
+    # Construct the full endpoint URL
+    endpoint = f"{endpoint_base}/{extension_name}?api-version=2024-03-01"
+    logging.info(f"Submitting PUT request to {endpoint}")
+
+    # Send the request
+    response = requests.put(endpoint, headers=headers, json=payload)
+
+    if response.status_code in [200, 201]:
+        logging.info("Password reset extension applied successfully.")
+    else:
+        try:
+            error_message = response.json().get("error", {}).get("message", "Unknown error.")
+        except ValueError:
+            error_message = response.text
+        logging.error(f"Failed to reset password: {error_message}")
+
+    logging.info("VM Password Reset: Finished")
+
+def vm_remove_extension(auth_config, params, token=False):
+    logging.info("Running the vm_remove_extension technique")
+
+    subscription_id = params.get("subscription_id", "")
+    resource_group = params.get("resource_group", "")
+    location = params.get("location", "")
+    vm_name = params.get("vm_name", "")
+    extension_name = params.get("extension_name", "")
+
+    if not subscription_id or not resource_group or not vm_name or not extension_name:
+        logging.error("Missing required parameters. Ensure subscription_id, resource_group, vm_name, and extension_name are provided.")
+        return
+
+    endpoint = (
+        f"https://management.azure.com/subscriptions/{subscription_id}/resourceGroups/{resource_group}/"
+        f"providers/Microsoft.Compute/virtualMachines/{vm_name}/extensions/{extension_name}?api-version=2024-07-01"
+    )
+
+    access_token = token["access_token"]
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+
+    logging.info(f"Initiating deletion of VM extension '{extension_name}' from VM '{vm_name}' in region '{location}'.")
+    response = requests.delete(endpoint, headers=headers)
+
+    if response.status_code in [200, 202]:
+        logging.info("VM extension deletion request succeeded.")
+    else:
+        try:
+            error_message = response.json().get("error", {}).get("message", "Unknown error.")
+        except ValueError:
+            error_message = response.text
+        logging.error(f"Failed to delete VM extension: {error_message}")
+
+    logging.info("VM Extension Deletion: Finished")        
