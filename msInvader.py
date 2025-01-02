@@ -356,6 +356,10 @@ def main():
                 
                 vm_execute_command(config['authentication'], parameters, tokens[session_name]['keyvault']) 
 
+            elif technique_name == 'execute_custom_script':
+                
+                execute_custom_script(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+
             elif technique_name == 'reset_password':
                 
                 vm_reset_password(config['authentication'], parameters, tokens[session_name]['keyvault']) 

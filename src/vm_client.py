@@ -256,3 +256,73 @@ def vm_remove_extension(auth_config, params, token=False):
         logging.error(f"Failed to delete VM extension: {error_message}")
 
     logging.info("VM Extension Deletion: Finished")        
+    
+
+def execute_custom_script(auth_config, params, token=False):
+    logging.info("Running the vm_add_extension technique")
+
+    subscription_id = params.get("subscription_id", "")
+    resource_group = params.get("resource_group", "")
+    location = params.get("location", "")
+    vm_name = params.get("vm_name", "")
+    extension_name = params.get("extension_name", "")
+    script_url = params.get("script_url", "")
+    os_type = params.get("os_type", "").lower()
+
+    if not subscription_id or not resource_group or not vm_name or not extension_name or not script_url or not os_type:
+        logging.error("Missing required parameters. Ensure all fields are provided.")
+        return
+
+    # Determine endpoint and payload
+    endpoint = (
+        f"https://management.azure.com/subscriptions/{subscription_id}/resourceGroups/{resource_group}/"
+        f"providers/Microsoft.Compute/virtualMachines/{vm_name}/extensions/{extension_name}?api-version=2022-08-01"
+    )
+
+    if os_type == "linux":
+        logging.info(f"Configuring Linux VM extension for script at: {script_url}")
+        publisher = "Microsoft.Azure.Extensions"
+        ext_type = "CustomScript"
+        command_to_execute = f"bash {script_url.split('/')[-1]}"
+    elif os_type == "windows":
+        logging.info(f"Configuring Windows VM extension for script at: {script_url}")
+        publisher = "Microsoft.Compute"
+        ext_type = "CustomScriptExtension"
+        command_to_execute = f"powershell -ExecutionPolicy Unrestricted -File {script_url.split('/')[-1]}"
+    else:
+        logging.error(f"Unsupported OS type: {os_type}. Must be 'linux' or 'windows'.")
+        return
+
+    payload = {
+        "location": location,
+        "properties": {
+            "publisher": publisher,
+            "type": ext_type,
+            "typeHandlerVersion": "1.9",
+            "autoUpgradeMinorVersion": True,
+            "settings": {
+                "fileUris": [script_url],
+                "commandToExecute": command_to_execute
+            }
+        }
+    }
+
+    access_token = token["access_token"]
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+
+    logging.info(f"Submitting PUT request to {endpoint}")
+    response = requests.put(endpoint, headers=headers, json=payload)
+
+    if response.status_code in [200, 201]:
+        logging.info("VM extension created successfully.")
+    else:
+        try:
+            error_message = response.json().get("error", {}).get("message", "Unknown error.")
+        except ValueError:
+            error_message = response.text
+        logging.error(f"Failed to create VM extension: {error_message}")
+
+    logging.info("VM Extension Creation: Finished")    
