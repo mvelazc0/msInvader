@@ -306,7 +306,7 @@ def main():
                 #W
                 enumerate_entities(config['authentication'], parameters, "directory_roles", tokens[session_name]['graph']) 
 
-            elif technique_name == 'change_password':
+            elif technique_name == 'change_user_password':
                 #W
                 change_user_password(config['authentication'], parameters, tokens[session_name]['graph']) 
   
