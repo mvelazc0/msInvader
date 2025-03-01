@@ -260,7 +260,7 @@ def run_compliance_search_rest(auth_config, params, token=False):
 
 def create_mailflow_rule_rest(auth_config, params, token=False):
 
-    logging.info("Running the create_mailfow_rule technique using the REST API")
+    logging.info("Running the create_mailflow_rule technique using the REST API")
     tenant_id = auth_config['tenant_id']
 
     rest_endpoint = f'https://outlook.office365.com/adminapi/beta/{tenant_id}/InvokeCommand'

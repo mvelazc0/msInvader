@@ -575,7 +575,7 @@ def enumerate_entities(auth_config, params, entity_type=None, token=False):
 
 def change_user_password(auth_config, params, token=False):
 
-    logging.info(f"Running the change_password technique")
+    logging.info(f"Running the change_user_password technique")
     user_id = params['user_id']
     new_password = params['new_password']
 

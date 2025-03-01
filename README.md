@@ -1,4 +1,5 @@
 # msInvader
+[![BlackHat Arsenal 2024](https://raw.githubusercontent.com/toolswatch/badges/refs/heads/master/arsenal/europe/2024.svg)](https://www.blackhat.com/eu-24/arsenal/schedule/index.html#msinvader-simulating-adversary-techniques-in-m-and-azure-42343)
 [![Open_Threat_Research Community](https://img.shields.io/badge/Open_Threat_Research-Community-brightgreen.svg)](https://twitter.com/OTR_Community)
 
 <div align="center">
@@ -17,7 +18,7 @@ Visit the [Wiki](https://github.com/mvelazc0/msInvader/wiki/) for documentation.
 
 ## Demo
 
-[![msInvader](https://img.youtube.com/vi/a6iUrufyXRE/0.jpg)](https://www.youtube.com/watch?v=a6iUrufyXRE)
+[![msInvader](https://img.youtube.com/vi/6VVX8n0bbl4/0.jpg)](https://www.youtube.com/watch?v=6VVX8n0bbl4&t=768s)
 
 
 ## Supported Techniques

