@@ -4,6 +4,7 @@ from src.graph_client import *
 from src.rest_client import *
 from src.keyvault_client import *
 from src.vm_client import *
+from src.arm_client import *
 from src.auth import *
 import logging
 import argparse
@@ -144,8 +145,8 @@ def main():
             rest_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], rest_scope)
             add_token(session_name, "rest", rest_token['access_token'], rest_token['refresh_token'], "0")        
             
-            keyvault_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], keyvault_scope)
-            add_token(session_name, "keyvault", keyvault_token['access_token'], keyvault_token['refresh_token'], "0")        
+            arm_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], arm_scope)
+            add_token(session_name, "keyvault", arm_token['access_token'], arm_token['refresh_token'], "0")        
             #print(keyvault_token)
         
         else:
@@ -371,6 +372,19 @@ def main():
             elif technique_name == 'delete_extension':
                 
                 vm_remove_extension(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+
+            elif technique_name == 'enumerate_arm_role_assignments':
+                
+                enumerate_arm_role_assignments(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+                
+            elif technique_name == 'enumerate_arm_resources':
+                
+                enumerate_arm_resources(config['authentication'], parameters, tokens[session_name]['keyvault'])                 
+
+            elif technique_name == 'enumerate_privileged_arm_role_holders':
+                
+                enumerate_privileged_arm_role_holders(config['authentication'], parameters, tokens[session_name]['keyvault'])                     
+                
                 
             # Apply sleep only if this is not the last technique
             if index < len(enabled_techniques) - 1:

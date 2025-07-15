@@ -4,7 +4,7 @@ import logging
 import random
 
 
-keyvault_scope = "https://management.azure.com/.default"
+arm_scope = "https://management.azure.com/.default"
 #keyvault_scope = "https://vault.azure.net/.default"
 
 
