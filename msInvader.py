@@ -146,7 +146,11 @@ def main():
             add_token(session_name, "rest", rest_token['access_token'], rest_token['refresh_token'], "0")        
             
             arm_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], arm_scope)
-            add_token(session_name, "keyvault", arm_token['access_token'], arm_token['refresh_token'], "0")        
+            add_token(session_name, "arm", arm_token['access_token'], arm_token['refresh_token'], "0")        
+
+            keyvault_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], keyvault_scope)
+            add_token(session_name, "keyvault", keyvault_token['access_token'], keyvault_token['refresh_token'], "0")    
+            
             #print(keyvault_token)
         
         else:
@@ -339,6 +343,7 @@ def main():
 
             elif technique_name == 'list_keyvault_items':
                 
+                print (tokens['testuser']['keyvault'])
                 list_keyvault_items(config['authentication'], parameters, tokens[session_name]['keyvault']) 
 
             elif technique_name == 'access_key_vault_item':
@@ -347,11 +352,11 @@ def main():
 
             elif technique_name == 'add_keyvault_access_policy':
                 
-                add_keyvault_access_policy(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+                add_keyvault_access_policy(config['authentication'], parameters, tokens[session_name]['arm']) 
 
             elif technique_name == 'list_keyvault_access_policies':
                 
-                list_keyvault_access_policies(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+                list_keyvault_access_policies(config['authentication'], parameters, tokens[session_name]['arm']) 
 
             elif technique_name == 'execute_command':
                 
