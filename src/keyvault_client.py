@@ -93,10 +93,10 @@ def list_keyvault_items(auth_config, params, token=False):
 
 def access_key_vault_item(auth_config, params, token=False):
     """
-    Access a specific item in the Key Vault. If item_type is not provided,
-    attempt to access the item as a secret, key, and certificate, and print/log all results.
+    Enhanced: Access and print details for all items in the Key Vault (secrets, keys, certificates).
+    If item_name is provided, access that specific item. If not, enumerate and print all items of each type.
     """
-    logging.info("Running the access_key_vault_item technique")
+    logging.info("Running the access_key_vault_item technique (enhanced)")
 
     keyvault_name = params.get('keyvault_name', "")
     item_type = params.get('item_type', "").lower()  # 'secret', 'key', 'certificate', or empty
@@ -104,10 +104,8 @@ def access_key_vault_item(auth_config, params, token=False):
     version = params.get('version', None)  # Optional version of the item
 
     if not keyvault_name:
-        logging.error("Key Vault URL and item_name are required.")
+        logging.error("Key Vault name is required.")
         return
-
-    types_to_try = ['secret', 'key', 'certificate'] if not item_type else [item_type]
 
     access_token = token["access_token"]
     headers = {
@@ -115,75 +113,105 @@ def access_key_vault_item(auth_config, params, token=False):
         "Content-Type": "application/json"
     }
 
+    # Map singular to plural for endpoint construction
+    type_map = {
+        "secret": "secrets",
+        "key": "keys",
+        "certificate": "certificates"
+    }
+
+    # If no item_type, try all; else, just the specified one
+    types_to_try = list(type_map.keys()) if not item_type else [item_type]
+
     found_any = False
+
     for current_type in types_to_try:
-        if current_type not in ['secret', 'key', 'certificate']:
+        if current_type not in type_map:
             logging.error(f"Invalid item_type: {current_type}. Must be 'secret', 'key', or 'certificate'.")
             continue
 
-        # Construct the base URL for the item
-        #"https://kvtest123.vault.azure.net"
-        endpoint = f"https://{keyvault_name}.vault.azure.net/{current_type}s/{item_name}"
-        if version:
-            endpoint += f"/{version}"
-        query_params = {"api-version": "7.3"}
+        plural_type = type_map[current_type]
 
-        logging.info(f"Submitting GET request to {endpoint}")
-
-        response = requests.get(endpoint, headers=headers, params=query_params)
-
-        if response.status_code == 200:
-            found_any = True
-            response_json = response.json()
-            print(response_json)
-            # If listing, print all item names
-            if "value" in response_json and isinstance(response_json["value"], list):
-                item_names = []
-                for entry in response_json["value"]:
-                    # Skip managed items
-                    if entry.get("managed", False):
-                        continue
-                    # Prefer 'id' for secrets/certs, 'kid' for keys
-                    if "id" in entry:
-                        name = entry["id"].split("/")[-1]
-                    elif "kid" in entry:
-                        name = entry["kid"].split("/")[-1]
-                    else:
-                        name = entry.get("name", "")
-                    item_names.append(name)
-                logging.info(f"200 OK - Successfully accessed Key Vault {current_type}")
-                for name in item_names:
-                    logging.info(name)
-            else:
-                # Single item access, print the name and value if present
-                if "name" in response_json:
-                    item_display_name = response_json["name"]
-                elif "kid" in response_json:
-                    item_display_name = response_json["kid"].split("/")[-1]
-                elif "id" in response_json:
-                    item_display_name = response_json["id"].split("/")[-1]
-                else:
-                    item_display_name = item_name
-                logging.info(f"200 OK - Successfully accessed Key Vault {current_type}")
-                logging.info(f"{item_display_name}")
+        # If item_name is provided, access that specific item
+        if item_name:
+            endpoint = f"https://{keyvault_name}.vault.azure.net/{plural_type}/{item_name}"
+            if version:
+                endpoint += f"/{version}"
+            query_params = {"api-version": "7.3"}
+            logging.info(f"Submitting GET request to {endpoint}")
+            response = requests.get(endpoint, headers=headers, params=query_params)
+            if response.status_code == 200:
+                found_any = True
+                response_json = response.json()
                 # Print the value of the secret/certificate/key if present
+                display_name = response_json.get("name") or response_json.get("kid", "").split("/")[-1] or response_json.get("id", "").split("/")[-1] or item_name
+                logging.info(f"200 OK - Successfully accessed Key Vault {current_type}: {display_name}")
                 if "value" in response_json:
-                    print(f"Value for {item_display_name}: {response_json['value']}")
+                    print(f"Value for {display_name}: {response_json['value']}")
                 elif "key" in response_json:
-                    print(f"Key material for {item_display_name}: {response_json['key']}")
+                    print(f"Key material for {display_name}: {response_json['key']}")
                 elif "cer" in response_json:
-                    print(f"Certificate for {item_display_name}: {response_json['cer']}")
+                    print(f"Certificate for {display_name}: {response_json['cer']}")
+                else:
+                    print(f"No value found for {display_name}")
+            else:
+                logging.error(f"Failed to access Key Vault {current_type} '{item_name}' with status code: {response.status_code}")
+                try:
+                    logging.error(response.json())
+                except Exception:
+                    logging.error(response.text)
+            logging.info(f"Access Key Vault {current_type.capitalize()} operation finished")
         else:
-            logging.error(f"Failed to access Key Vault {current_type} with status code: {response.status_code}")
-            try:
-                logging.error(response.json())
-            except Exception:
-                logging.error(response.text)
-
-        logging.info(f"Access Key Vault {current_type.capitalize()} operation finished")
+            # No item_name: enumerate all items of this type and print their details
+            list_endpoint = f"https://{keyvault_name}.vault.azure.net/{plural_type}"
+            query_params = {"api-version": "7.3"}
+            logging.info(f"Enumerating all {plural_type} at {list_endpoint}")
+            response = requests.get(list_endpoint, headers=headers, params=query_params)
+            if response.status_code == 200:
+                items = response.json().get("value", [])
+                # Exclude managed items for secrets and keys
+                if current_type in ["secret", "key"]:
+                    items = [item for item in items if not item.get("managed", False)]
+                logging.info(f"Found {len(items)} {plural_type}.")
+                for entry in items:
+                    # Get the item name from the id
+                    item_id = entry.get("id") or entry.get("kid")
+                    if not item_id:
+                        continue
+                    item_name_extracted = item_id.split("/")[-1]
+                    # Now fetch the actual item details
+                    item_endpoint = f"https://{keyvault_name}.vault.azure.net/{plural_type}/{item_name_extracted}"
+                    item_query_params = {"api-version": "7.3"}
+                    item_response = requests.get(item_endpoint, headers=headers, params=item_query_params)
+                    if item_response.status_code == 200:
+                        found_any = True
+                        item_json = item_response.json()
+                        display_name = item_json.get("name") or item_json.get("kid", "").split("/")[-1] or item_json.get("id", "").split("/")[-1] or item_name_extracted
+                        logging.info(f"200 OK - {current_type.capitalize()}: {display_name}")
+                        if "value" in item_json:
+                            print(f"Value for {display_name}: {item_json['value']}")
+                        elif "key" in item_json:
+                            print(f"Key material for {display_name}: {item_json['key']}")
+                        elif "cer" in item_json:
+                            print(f"Certificate for {display_name}: {item_json['cer']}")
+                        else:
+                            print(f"No value found for {display_name}")
+                    else:
+                        logging.error(f"Failed to get details for {current_type} '{item_name_extracted}': {item_response.status_code}")
+                        try:
+                            logging.error(item_response.json())
+                        except Exception:
+                            logging.error(item_response.text)
+            else:
+                logging.error(f"Failed to list Key Vault {plural_type} with status code: {response.status_code}")
+                try:
+                    logging.error(response.json())
+                except Exception:
+                    logging.error(response.text)
+            logging.info(f"Enumeration for {plural_type} finished.")
 
     if not found_any:
-        logging.error("Could not access the item as any supported type (secret, key, certificate).")
+        logging.error("Could not access any items as secret, key, or certificate.")
 
 def add_keyvault_access_policy(auth_config, params, token=False):
     logging.info("Running the keyvault_add_access_policy technique")
