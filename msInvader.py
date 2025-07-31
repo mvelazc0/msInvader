@@ -339,7 +339,7 @@ def main():
 
             elif technique_name == 'list_key_vaults':
                 
-                list_key_vaults(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+                list_key_vaults(config['authentication'], parameters, tokens[session_name]['arm']) 
 
             elif technique_name == 'list_keyvault_items':
                 
@@ -379,15 +379,15 @@ def main():
 
             elif technique_name == 'enumerate_arm_role_assignments':
                 
-                enumerate_arm_role_assignments(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+                enumerate_arm_role_assignments(config['authentication'], parameters, tokens[session_name]['arm']) 
                 
             elif technique_name == 'enumerate_arm_resources':
                 
-                enumerate_arm_resources(config['authentication'], parameters, tokens[session_name]['keyvault'])                 
+                enumerate_arm_resources(config['authentication'], parameters, tokens[session_name]['arm'])                 
 
             elif technique_name == 'enumerate_privileged_arm_role_holders':
                 
-                enumerate_privileged_arm_role_holders(config['authentication'], parameters, tokens[session_name]['keyvault'])      
+                enumerate_privileged_arm_role_holders(config['authentication'], parameters, tokens[session_name]['arm'])      
 
             elif technique_name == 'enumerate_app_role_assignments':                
                 
