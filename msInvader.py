@@ -211,7 +211,7 @@ def main():
                 
                 if access_method == 'graph':
                     #W
-                    read_email_graph(config['authentication'], parameters, tokens[session_name]['graph'])
+                    read_email_graph2(config['authentication'], parameters, tokens[session_name]['graph'])
 
                 elif access_method == 'ews':
                     #W
