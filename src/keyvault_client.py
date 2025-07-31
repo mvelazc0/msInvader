@@ -189,13 +189,13 @@ def access_key_vault_item(auth_config, params, token=False):
                         display_name = item_json.get("name") or item_json.get("kid", "").split("/")[-1] or item_json.get("id", "").split("/")[-1] or item_name_extracted
                         logging.info(f"200 OK - {current_type.capitalize()}: {display_name}")
                         if "value" in item_json:
-                            print(f"Value for {display_name}: {item_json['value']}")
+                            logging.info(f"Value for {display_name}: {item_json['value']}")
                         elif "key" in item_json:
-                            print(f"Key material for {display_name}: {item_json['key']}")
+                            logging.info(f"Key material for {display_name}: {item_json['key']}")
                         elif "cer" in item_json:
-                            print(f"Certificate for {display_name}: {item_json['cer']}")
+                            logging.info(f"Certificate for {display_name}: {item_json['cer']}")
                         else:
-                            print(f"No value found for {display_name}")
+                            logging.info(f"No value found for {display_name}")
                     else:
                         logging.error(f"Failed to get details for {current_type} '{item_name_extracted}': {item_response.status_code}")
                         try:

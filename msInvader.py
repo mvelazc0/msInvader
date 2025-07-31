@@ -343,7 +343,6 @@ def main():
 
             elif technique_name == 'list_keyvault_items':
                 
-                print (tokens['testuser']['keyvault'])
                 list_keyvault_items(config['authentication'], parameters, tokens[session_name]['keyvault']) 
 
             elif technique_name == 'access_key_vault_item':
@@ -388,7 +387,11 @@ def main():
 
             elif technique_name == 'enumerate_privileged_arm_role_holders':
                 
-                enumerate_privileged_arm_role_holders(config['authentication'], parameters, tokens[session_name]['keyvault'])                     
+                enumerate_privileged_arm_role_holders(config['authentication'], parameters, tokens[session_name]['keyvault'])      
+
+            elif technique_name == 'enumerate_app_role_assignments':                
+                
+                enumerate_app_role_assignments(config['authentication'], parameters, tokens[session_name]['graph'])      
                 
                 
             # Apply sleep only if this is not the last technique
