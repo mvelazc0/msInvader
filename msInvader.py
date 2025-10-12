@@ -2,6 +2,9 @@ import yaml
 from src.ews_client import *
 from src.graph_client import *
 from src.rest_client import *
+from src.keyvault_client import *
+from src.vm_client import *
+from src.arm_client import *
 from src.auth import *
 import logging
 import argparse
@@ -141,6 +144,14 @@ def main():
 
             rest_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], rest_scope)
             add_token(session_name, "rest", rest_token['access_token'], rest_token['refresh_token'], "0")        
+            
+            arm_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], arm_scope)
+            add_token(session_name, "arm", arm_token['access_token'], arm_token['refresh_token'], "0")        
+
+            keyvault_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], keyvault_scope)
+            add_token(session_name, "keyvault", keyvault_token['access_token'], keyvault_token['refresh_token'], "0")    
+            
+            #print(keyvault_token)
         
         else:
             graph_token = get_ms_token(config['authentication'], session_details, graph_scope)
@@ -151,6 +162,8 @@ def main():
  
             rest_token = get_ms_token(config['authentication'], session_details, rest_scope)
             add_token(session_name, "ews", rest_token['access_token'], "0", "0")
+            
+
             
         
     logging.info("************* Starting playbook execution *************")
@@ -198,7 +211,7 @@ def main():
                 
                 if access_method == 'graph':
                     #W
-                    read_email_graph(config['authentication'], parameters, tokens[session_name]['graph'])
+                    read_email_graph2(config['authentication'], parameters, tokens[session_name]['graph'])
 
                 elif access_method == 'ews':
                     #W
@@ -323,6 +336,63 @@ def main():
             elif technique_name == 'assign_entra_role':
                 #W
                 assign_entra_role_graph(config['authentication'], parameters, tokens[session_name]['graph']) 
+
+            elif technique_name == 'list_key_vaults':
+                
+                list_key_vaults(config['authentication'], parameters, tokens[session_name]['arm']) 
+
+            elif technique_name == 'list_keyvault_items':
+                
+                list_keyvault_items(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+
+            elif technique_name == 'access_key_vault_item':
+                
+                access_key_vault_item(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+
+            elif technique_name == 'add_keyvault_access_policy':
+                
+                add_keyvault_access_policy(config['authentication'], parameters, tokens[session_name]['arm']) 
+
+            elif technique_name == 'list_keyvault_access_policies':
+                
+                list_keyvault_access_policies(config['authentication'], parameters, tokens[session_name]['arm']) 
+
+            elif technique_name == 'execute_command':
+                
+                vm_execute_command(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+
+            elif technique_name == 'execute_custom_script':
+                
+                execute_custom_script(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+
+            elif technique_name == 'reset_password':
+                
+                vm_reset_password(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+
+            elif technique_name == 'list_extensions':
+                
+                vm_list_extensions(config['authentication'], parameters, tokens[session_name]['keyvault'])                 
+                
+            elif technique_name == 'delete_extension':
+                
+                vm_remove_extension(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+
+            elif technique_name == 'enumerate_arm_role_assignments':
+                
+                enumerate_arm_role_assignments(config['authentication'], parameters, tokens[session_name]['arm']) 
+                
+            elif technique_name == 'enumerate_arm_resources':
+                
+                enumerate_arm_resources(config['authentication'], parameters, tokens[session_name]['arm'])                 
+
+            elif technique_name == 'enumerate_privileged_arm_role_holders':
+                
+                enumerate_privileged_arm_role_holders(config['authentication'], parameters, tokens[session_name]['arm'])      
+
+            elif technique_name == 'enumerate_app_role_assignments':                
+                
+                enumerate_app_role_assignments(config['authentication'], parameters, tokens[session_name]['graph'])      
+                
                 
             # Apply sleep only if this is not the last technique
             if index < len(enabled_techniques) - 1:

@@ -43,6 +43,49 @@ def read_email_graph(auth_config, params, token=False):
         logging.error(f"Operation failed with status code {response.status_code }")
         #print (response.json())
 
+def read_email_graph2(auth_config, params, token=False):
+
+    logging.info("Running the read_email technique using the Graph API")
+
+    if not token:
+        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
+
+
+    access_token = token['access_token']
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+
+
+    mailboxes = params['mailbox']
+    if not isinstance(mailboxes, list):  
+        mailboxes = [mailboxes]
+        
+    for mailbox in mailboxes:
+        logging.info(f"Processing mailbox: {mailbox}")
+        
+        graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/Inbox/messages'
+
+
+
+        short_endpoint = graph_endpoint.replace("https://graph.microsoft.com","")
+        #logging.info(f"Submitting GET request to v1.0/users/me/mailFolders/Inbox/messages")
+        logging.info(f"Submitting GET request to {short_endpoint}")
+        response = requests.get(graph_endpoint, headers=headers)
+
+        if response.status_code == 200:
+            logging.info("200 OK")
+            messages = response.json().get('value', [])
+            for message in messages[:params['limit']]:
+                #print(message.get('subject'), message.get('from'))
+                #body_content = message.get('body', {}).get('content', '')
+                logging.info(f"Read email with subject: {message.get('subject')}")
+                #print("Body:", body_content)
+
+        else:
+            logging.error(f"Operation failed with status code {response.status_code }")
+            #print (response.json())
 
 def search_email_graph(auth_config, params, token=False):
 
@@ -802,3 +845,71 @@ def get_user_object_guid(auth_config, params, upn, token=False):
 
     return None
         
+def enumerate_app_role_assignments(auth_config, params, token=False):
+    """
+    Lists all app roles assigned to the calling principal (user or service principal) using Microsoft Graph API.
+    Automatically determines the correct endpoint based on the token.
+    """
+    import logging
+    import base64
+    import json
+
+    logging.info("Running the enumerate_app_role_assignments technique using the Graph API")
+
+    if not token:
+        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
+
+
+    access_token = token['access_token']
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+
+    # Try user endpoint first
+    graph_endpoint = 'https://graph.microsoft.com/v1.0/me/appRoleAssignments'
+    short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
+    logging.info(f"Submitting GET request to {short_endpoint} (user endpoint)")
+
+    response = requests.get(graph_endpoint, headers=headers)
+
+    if response.status_code == 200:
+        app_roles = response.json().get('value', [])
+        logging.info(f"Enumeration successful. Found {len(app_roles)} app role assignments (user endpoint).")
+        for assignment in app_roles:
+            logging.info(f"App Role Assignment: {assignment}")
+        return app_roles
+    else:
+        logging.warning(f"User endpoint failed with status code: {response.status_code}. Trying service principal endpoint...")
+
+        # Decode JWT to get object id (oid)
+        try:
+            jwt_parts = access_token.split('.')
+            if len(jwt_parts) != 3:
+                raise Exception("Invalid JWT format")
+            payload_b64 = jwt_parts[1] + '=' * (-len(jwt_parts[1]) % 4)
+            payload = json.loads(base64.urlsafe_b64decode(payload_b64.encode('utf-8')))
+            sp_oid = payload.get('oid')
+            if not sp_oid:
+                raise Exception("No 'oid' claim found in access token")
+        except Exception as e:
+            logging.error(f"Failed to decode access token for service principal object id: {e}")
+            logging.error(response.text)
+            return None
+
+        graph_endpoint = f'https://graph.microsoft.com/v1.0/servicePrincipals/{sp_oid}/appRoleAssignments'
+        short_endpoint = graph_endpoint.replace("https://graph.microsoft.com", "")
+        logging.info(f"Submitting GET request to {short_endpoint} (service principal endpoint)")
+
+        response = requests.get(graph_endpoint, headers=headers)
+
+        if response.status_code == 200:
+            app_roles = response.json().get('value', [])
+            logging.info(f"Enumeration successful. Found {len(app_roles)} app role assignments (service principal endpoint).")
+            for assignment in app_roles:
+                logging.info(f"App Role Assignment: {assignment}")
+            return app_roles
+        else:
+            logging.error(f"Failed to enumerate app role assignments for both user and service principal. Status code: {response.status_code}")
+            logging.error(response.text)
+            return None
