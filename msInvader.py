@@ -5,6 +5,7 @@ from src.rest_client import *
 from src.keyvault_client import *
 from src.vm_client import *
 from src.arm_client import *
+from src.device_client import *
 from src.auth import *
 import logging
 import argparse
@@ -188,7 +189,7 @@ def main():
             parameters = technique['parameters']
             session_name = parameters.get('session', 'nosession')
             #session_name = parameters['session']
-            access_method = parameters['access_method']
+            access_method = parameters.get('access_method')
             parameters['ews_impersonation'] = False
 
             
@@ -389,11 +390,19 @@ def main():
                 
                 enumerate_privileged_arm_role_holders(config['authentication'], parameters, tokens[session_name]['arm'])      
 
-            elif technique_name == 'enumerate_app_role_assignments':                
+            elif technique_name == 'enumerate_app_role_assignments':
+
+                enumerate_app_role_assignments(config['authentication'], parameters, tokens[session_name]['graph'])
+
+            elif technique_name == 'register_device':
                 
-                enumerate_app_role_assignments(config['authentication'], parameters, tokens[session_name]['graph'])      
-                
-                
+                drs_username = config['authentication']['sessions'][session_name]['username']
+                drs_token = get_drs_token_device_code(config['authentication']['tenant_id'], drs_username)
+                if drs_token:
+                    register_device(config['authentication'], parameters, drs_token)
+                else:
+                    logging.error("Failed to obtain a DRS-scoped token; skipping register_device.")
+
             # Apply sleep only if this is not the last technique
             if index < len(enabled_techniques) - 1:
                 if sleep is not None:

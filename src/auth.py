@@ -2,6 +2,8 @@ import requests
 import time
 import logging
 import random
+import base64
+import json
 
 def get_ms_token_client(tenant_id, client_id, client_secret, scope):
 
@@ -80,13 +82,13 @@ def get_device_code(tenant_id, client_id, scope):
     response = requests.post(url, data=data).json()
     return response
 
-def get_ms_token_device_code(tenant_id, username , scope):
+def get_ms_token_device_code(tenant_id, username , scope, client_id=None):
 
     logging.info(f"Using device code OAuth flow to obtain a token for {username}")
 
-    #client_id = '00b41c95-dab0-4487-9791-b9d2c32c80f2' # Office 365 Management. Works to read emails Graph and EWS.
-    client_id = 'd3590ed6-52b3-4102-aeff-aad2292ab01c' # Microsoft Office. Works for searching one drive files
-    
+    if client_id is None:
+        #client_id = '00b41c95-dab0-4487-9791-b9d2c32c80f2' # Office 365 Management. Works to read emails Graph and EWS.
+        client_id = 'd3590ed6-52b3-4102-aeff-aad2292ab01c' # Microsoft Office. Works for searching one drive files
 
 
     device_code_response = get_device_code(tenant_id, client_id, scope)
@@ -128,7 +130,67 @@ def get_ms_token_device_code(tenant_id, username , scope):
             access_token = token_response.get('access_token')
             return {'access_token': access_token, 'refresh_token': refresh_token}
             #return token_response.get('access_token')
-    
+
+
+def _debug_log_token_claims(access_token):
+    try:
+        payload_b64 = access_token.split('.')[1]
+        padded = payload_b64 + '=' * (-len(payload_b64) % 4)
+        claims = json.loads(base64.urlsafe_b64decode(padded))
+        logging.info(f"Token claims: aud={claims.get('aud')} appid={claims.get('appid')} scp={claims.get('scp')} roles={claims.get('roles')}")
+    except Exception as e:
+        logging.error(f"Could not decode token claims: {e}")
+
+
+def get_drs_token_device_code(tenant_id, username):
+
+    # TEST-ONLY function for the device-registration (PRT) chain. Kept separate from
+    # get_ms_token_device_code so the existing, working device-code flow is not put
+    # at risk while this one is being validated against a real DRS join.
+
+    logging.info(f"Using device code OAuth flow to obtain a DRS-scoped token for {username}")
+
+    client_id = '1b730954-1685-4b74-9bfd-dac224a7b894'  # Azure AD PowerShell
+    scope = '01cb2876-7ebd-4aa4-9cc9-d28bd4d359a9/.default'  # Device Registration Service
+
+    device_code_response = get_device_code(tenant_id, client_id, scope)
+
+    user_code = device_code_response.get("user_code")
+    device_code = device_code_response.get("device_code")
+
+    if not device_code:
+        logging.error(f"Failed to obtain a device code: {device_code_response}")
+        return
+
+    logging.info(f"Submit {user_code} at https://microsoft.com/devicelogin for DRS token acquisition")
+
+    token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+    token_data = {
+        "grant_type": "device_code",
+        "device_code": device_code,
+        "client_id": client_id
+    }
+
+    while True:
+
+        time.sleep(5)
+        token_response = requests.post(token_url, data=token_data).json()
+
+        if "error" in token_response:
+            if token_response["error"] == "authorization_pending":
+                logging.error("Authorization pending. Please complete the user authentication.")
+            elif token_response["error"] == "slow_down":
+                time.sleep(5)
+            else:
+                print("Error:", token_response.get("error_description"))
+                return
+        else:
+            refresh_token = token_response.get('refresh_token')
+            access_token = token_response.get('access_token')
+            if access_token:
+                _debug_log_token_claims(access_token)
+            return {'access_token': access_token, 'refresh_token': refresh_token}
+
 
 def get_new_token_with_refresh_token(tenant_id, refresh_token, new_scope):
 
