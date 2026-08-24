@@ -358,7 +358,6 @@ def request_prt(params):
 
 		logging.info(f"Successfully obtained PRT for device {device_id}")
 		logging.info(f"Session key and TGTs saved to {prt_out}")
-		logging.info(f"[DETECTION] Device {device_id} obtained PRT via certificate + refresh_token")
 
 		return output
 
