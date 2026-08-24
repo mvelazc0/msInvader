@@ -442,6 +442,10 @@ def main():
 
                 request_prt(parameters)
 
+            elif technique_name == 'get_token_with_prt':
+
+                get_token_with_prt(parameters)
+
             # Apply sleep only if this is not the last technique
             if index < len(enabled_techniques) - 1:
                 if sleep is not None:
