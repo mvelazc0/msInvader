@@ -7,8 +7,11 @@ from src.vm_client import *
 from src.arm_client import *
 from src.device_client import *
 from src.auth import *
+from src.graph_client import prt_scope
 import logging
 import argparse
+import time
+import random
 
 ### Other
 
@@ -86,6 +89,32 @@ def add_token(session_name, scope, access_token, refresh_token, expiry):
         "expiry": expiry
     }
 
+    # Persist tokens to disk for debugging
+    save_tokens_to_disk(session_name, scope, access_token, refresh_token)
+
+
+def save_tokens_to_disk(session_name, scope, access_token, refresh_token):
+    """Save tokens to disk for debugging/reuse without re-authentication"""
+    import json
+    from datetime import datetime
+
+    token_file = f"tokens_{session_name}_{scope.replace('/', '_').replace('.', '_').replace(':', '')}.json"
+
+    token_data = {
+        "session": session_name,
+        "scope": scope,
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "saved_at": datetime.utcnow().isoformat()
+    }
+
+    try:
+        with open(token_file, 'w') as f:
+            json.dump(token_data, f, indent=2)
+        logging.debug(f"Tokens saved to {token_file}")
+    except Exception as e:
+        logging.error(f"Failed to save tokens to disk: {e}")
+
 def get_token(session_name, scope):
 
     session_tokens = tokens.get(session_name)
@@ -137,22 +166,22 @@ def main():
     for session_name, session_details in config["authentication"]["sessions"].items():
         
         if session_details['type'] != 'client_credentials':
-            graph_token = get_ms_token(config['authentication'], session_details, graph_scope)
+            # Use custom scope if specified in session config, otherwise default to graph_scope
+            scope = session_details.get('scope', graph_scope)
+            graph_token = get_ms_token(config['authentication'], session_details, scope)
             add_token(session_name, "graph", graph_token['access_token'], graph_token['refresh_token'], "0")
-            
-            ews_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], ews_scope)
-            add_token(session_name, "ews", ews_token['access_token'], ews_token['refresh_token'], "0")
 
-            rest_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], rest_scope)
-            add_token(session_name, "rest", rest_token['access_token'], rest_token['refresh_token'], "0")        
-            
-            arm_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], arm_scope)
-            add_token(session_name, "arm", arm_token['access_token'], arm_token['refresh_token'], "0")        
+            #ews_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], ews_scope)
+            #add_token(session_name, "ews", ews_token['access_token'], ews_token['refresh_token'], "0")
 
-            keyvault_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], keyvault_scope)
-            add_token(session_name, "keyvault", keyvault_token['access_token'], keyvault_token['refresh_token'], "0")    
-            
-            #print(keyvault_token)
+            #rest_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], rest_scope)
+            #add_token(session_name, "rest", rest_token['access_token'], rest_token['refresh_token'], "0")
+
+            #arm_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], arm_scope)
+            #add_token(session_name, "arm", arm_token['access_token'], arm_token['refresh_token'], "0")
+
+            ##keyvault_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], keyvault_scope)
+            #dd_token(session_name, "keyvault", keyvault_token['access_token'], keyvault_token['refresh_token'], "0")
         
         else:
             graph_token = get_ms_token(config['authentication'], session_details, graph_scope)
@@ -395,13 +424,23 @@ def main():
                 enumerate_app_role_assignments(config['authentication'], parameters, tokens[session_name]['graph'])
 
             elif technique_name == 'register_device':
-                
+
                 drs_username = config['authentication']['sessions'][session_name]['username']
                 drs_token = get_drs_token_device_code(config['authentication']['tenant_id'], drs_username)
                 if drs_token:
                     register_device(config['authentication'], parameters, drs_token)
                 else:
                     logging.error("Failed to obtain a DRS-scoped token; skipping register_device.")
+
+            elif technique_name == 'request_prt':
+
+                # Auto-inject refresh_token from session if not provided
+                if 'refresh_token' not in parameters and session_name in tokens:
+                    if 'graph' in tokens[session_name]:
+                        parameters['refresh_token'] = tokens[session_name]['graph'].get('refresh_token')
+                        logging.debug(f"Injected refresh_token from session '{session_name}' into request_prt")
+
+                request_prt(parameters)
 
             # Apply sleep only if this is not the last technique
             if index < len(enabled_techniques) - 1:
