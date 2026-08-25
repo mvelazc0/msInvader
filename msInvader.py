@@ -447,7 +447,7 @@ def main():
                 # else:
                 #     logging.error("Failed to obtain a DRS-scoped token; skipping register_device.")
 
-            elif technique_name == 'request_prt':
+            elif technique_name == 'get_prt_with_refresh_token':
 
                 # Load refresh_token from file if specified
                 if 'refresh_token_file' in parameters and 'refresh_token' not in parameters:
@@ -468,9 +468,9 @@ def main():
                 if 'refresh_token' not in parameters and session_name in tokens:
                     if 'graph' in tokens[session_name]:
                         parameters['refresh_token'] = tokens[session_name]['graph'].get('refresh_token')
-                        logging.debug(f"Injected refresh_token from session '{session_name}' into request_prt")
+                        logging.debug(f"Injected refresh_token from session '{session_name}' into get_prt_with_refresh_token")
 
-                request_prt(parameters)
+                get_prt_with_refresh_token(parameters)
 
             elif technique_name == 'get_token_with_prt':
 
