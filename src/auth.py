@@ -70,7 +70,7 @@ def get_ms_token_username_pass(tenant_id, username, password, scope):
         #print (response.text)
 
 
-def get_device_code(tenant_id, client_id, scope):
+def get_device_code(tenant_id, client_id, scope, claims=None):
 
     url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/devicecode"
     full_scope = f'{scope} offline_access' # required if we want a refresh token
@@ -79,10 +79,12 @@ def get_device_code(tenant_id, client_id, scope):
         "client_id": client_id,
         "scope": full_scope
     }
+    if claims:
+        data["claims"] = json.dumps(claims)
     response = requests.post(url, data=data).json()
     return response
 
-def get_ms_token_device_code(tenant_id, username , scope, client_id=None):
+def get_ms_token_device_code(tenant_id, username, scope, client_id=None, require_ngcmfa=False):
 
     logging.info(f"Using device code OAuth flow to obtain a token for {username}")
 
@@ -91,7 +93,19 @@ def get_ms_token_device_code(tenant_id, username , scope, client_id=None):
         client_id = 'd3590ed6-52b3-4102-aeff-aad2292ab01c' # Microsoft Office. Works for searching one drive files
 
 
-    device_code_response = get_device_code(tenant_id, client_id, scope)
+    claims = None
+    if require_ngcmfa:
+        claims = {
+            "access_token": {
+                "amr": {
+                    "essential": True,
+                    "values": ["ngcmfa"]
+                }
+            }
+        }
+        logging.info("Requesting an access token with the essential ngcmfa AMR claim")
+
+    device_code_response = get_device_code(tenant_id, client_id, scope, claims)
 
 
     user_code = device_code_response.get("user_code")
@@ -244,11 +258,14 @@ def get_ms_token(auth_config, session_details, scope):
     app_id = session_details.get('app_id', '')
     secret = session_details.get('secret', '')
     client_id = session_details.get('client_id', None)  # Optional: specify client_id for device_code flow
+    require_ngcmfa = session_details.get('require_ngcmfa', False)
 
     if auth_method == 'resource_owner':
         return get_ms_token_username_pass(auth_config['tenant_id'], username, password, scope)
     elif auth_method == 'device_code':
-        return get_ms_token_device_code(auth_config['tenant_id'], username, scope, client_id)
+        return get_ms_token_device_code(
+            auth_config['tenant_id'], username, scope, client_id, require_ngcmfa
+        )
     elif auth_method == 'client_credentials':
         return get_ms_token_client(auth_config['tenant_id'], app_id, secret, scope)    
 
