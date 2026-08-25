@@ -476,6 +476,10 @@ def main():
 
                 get_token_with_prt(parameters)
 
+            elif technique_name == 'get_prt_with_whfb_key':
+
+                get_prt_with_whfb_key(parameters)
+
             elif technique_name == 'create_whfb_key':
 
                 # Load access_token from file if specified
