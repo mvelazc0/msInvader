@@ -169,10 +169,10 @@ def main():
         
         if session_details['type'] != 'client_credentials':
             # Use custom scope if specified in session config, otherwise default to graph_scope
-            scope = session_details.get('scope', graph_scope)
-            graph_token = get_ms_token(config['authentication'], session_details, scope)
-            add_token(session_name, "graph", graph_token['access_token'], graph_token['refresh_token'], "0")
-            #pass
+            #scope = session_details.get('scope', graph_scope)
+            #graph_token = get_ms_token(config['authentication'], session_details, scope)
+            #add_token(session_name, "graph", graph_token['access_token'], graph_token['refresh_token'], "0")
+            pass
 
             #ews_token = get_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], ews_scope)
             #add_token(session_name, "ews", ews_token['access_token'], ews_token['refresh_token'], "0")
@@ -489,13 +489,23 @@ def main():
                         parameters['refresh_token'] = tokens[session_name]['graph'].get('refresh_token')
                         logging.debug(f"Injected refresh_token from session '{session_name}' into get_prt_with_refresh_token")
 
+                # Inject global tenant_id if not provided
+                if 'tenant_id' not in parameters:
+                    parameters['tenant_id'] = config['authentication']['tenant_id']
+
                 get_prt_with_refresh_token(parameters)
 
             elif technique_name == 'get_token_with_prt':
 
+                if 'tenant_id' not in parameters:
+                    parameters['tenant_id'] = config['authentication']['tenant_id']
+
                 get_token_with_prt(parameters)
 
             elif technique_name == 'get_prt_with_whfb_key':
+
+                if 'tenant_id' not in parameters:
+                    parameters['tenant_id'] = config['authentication']['tenant_id']
 
                 get_prt_with_whfb_key(parameters)
 
