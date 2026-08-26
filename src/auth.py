@@ -206,32 +206,39 @@ def get_drs_token_device_code(tenant_id, username):
             return {'access_token': access_token, 'refresh_token': refresh_token}
 
 
-def get_new_token_with_refresh_token(tenant_id, refresh_token, new_scope):
+def get_token_with_refresh_token(tenant_id, refresh_token, scope=None, resource=None, client_id=None):
 
-    logging.info("Using refresh token to obtain a new access token for a different scope")
+    logging.info("Using refresh token to obtain a new access token")
+
+    if not scope and not resource:
+        logging.error("Either 'scope' (v2.0) or 'resource' (v1.0) must be provided")
+        return None
+
+    if scope and resource:
+        logging.error("Provide only 'scope' (v2.0) or 'resource' (v1.0), not both")
+        return None
+
+    if not client_id:
+        client_id = 'd3590ed6-52b3-4102-aeff-aad2292ab01c'  # Microsoft Office default
 
     token_url = f'https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token'
-    
-    #client_id = '00b41c95-dab0-4487-9791-b9d2c32c80f2' # Office 365 Management. Works to read emails Graph and EWS.
-    client_id = 'd3590ed6-52b3-4102-aeff-aad2292ab01c' # Microsoft Office. Works for searching one drive files
-
-
-    # Note: Including 'offline_access' in the new scope ensures you get a new refresh token
-    #full_scope = f'{new_scope} offline_access'
-    full_scope = f'{new_scope}'
 
     token_data = {
         'client_id': client_id,
         'grant_type': 'refresh_token',
-        'refresh_token': refresh_token,
-        'scope': full_scope
+        'refresh_token': refresh_token
     }
+
+    if scope:
+        token_data['scope'] = scope
+    if resource:
+        token_data['resource'] = resource
 
     response = requests.post(token_url, data=token_data)
     response_json = response.json()
 
     new_access_token = response_json.get('access_token')
-    new_refresh_token = response_json.get('refresh_token') 
+    new_refresh_token = response_json.get('refresh_token')
 
     if new_access_token:
         return {'access_token': new_access_token, 'refresh_token': new_refresh_token}

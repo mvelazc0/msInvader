@@ -2,7 +2,7 @@ import requests
 import logging
 import datetime
 import os
-from src.auth import get_ms_token, get_new_token_with_refresh_token
+from src.auth import get_ms_token, get_token_with_refresh_token
 
 ### Graph
 
@@ -556,7 +556,7 @@ def send_email_graph(auth_config, params, token=False):
         #print (response.json())
         #return response.json()  
         
-    #new_token = get_new_token_with_refresh_token(auth_config['tenant_id'], refresh_token, "https://outlook.office365.com/.default")
+    #new_token = get_token_with_refresh_token(auth_config['tenant_id'], refresh_token, "https://outlook.office365.com/.default")
     #print("new_token")
     #print (new_token['access_token'])
     

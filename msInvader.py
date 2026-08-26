@@ -164,7 +164,7 @@ def main():
     
     config = load_config(config_path)
 
-    """
+    
     for session_name, session_details in config["authentication"]["sessions"].items():
         
         if session_details['type'] != 'client_credentials':
@@ -172,17 +172,18 @@ def main():
             scope = session_details.get('scope', graph_scope)
             graph_token = get_ms_token(config['authentication'], session_details, scope)
             add_token(session_name, "graph", graph_token['access_token'], graph_token['refresh_token'], "0")
+            #pass
 
-            #ews_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], ews_scope)
+            #ews_token = get_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], ews_scope)
             #add_token(session_name, "ews", ews_token['access_token'], ews_token['refresh_token'], "0")
 
-            #rest_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], rest_scope)
+            #rest_token = get_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], rest_scope)
             #add_token(session_name, "rest", rest_token['access_token'], rest_token['refresh_token'], "0")
 
-            #arm_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], arm_scope)
+            #arm_token = get_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], arm_scope)
             #add_token(session_name, "arm", arm_token['access_token'], arm_token['refresh_token'], "0")
 
-            ##keyvault_token = get_new_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], keyvault_scope)
+            ##keyvault_token = get_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], keyvault_scope)
             #dd_token(session_name, "keyvault", keyvault_token['access_token'], keyvault_token['refresh_token'], "0")
         
         else:
@@ -194,7 +195,7 @@ def main():
  
             rest_token = get_ms_token(config['authentication'], session_details, rest_scope)
             add_token(session_name, "ews", rest_token['access_token'], "0", "0")
-    """            
+                
 
             
         
@@ -427,18 +428,35 @@ def main():
 
             elif technique_name == 'register_device':
 
-                # Use access token from session instead of doing device code auth again
-                if session_name in tokens and 'graph' in tokens[session_name]:
+                access_token = None
+
+                # Load access_token from file if specified
+                if 'access_token_file' in parameters and 'access_token' not in parameters:
+                    try:
+                        with open(parameters['access_token_file'], 'r') as f:
+                            token_data = json.load(f)
+                        if 'access_token' in token_data:
+                            access_token = token_data['access_token']
+                            logging.debug(f"Loaded access_token from {parameters['access_token_file']}")
+                        else:
+                            logging.error(f"No 'access_token' field in {parameters['access_token_file']}")
+                    except FileNotFoundError:
+                        logging.error(f"access_token_file not found: {parameters['access_token_file']}")
+                    except json.JSONDecodeError as e:
+                        logging.error(f"Failed to parse {parameters['access_token_file']}: {e}")
+
+                # Fall back to session-based token if not provided via file
+                if not access_token and session_name in tokens and 'graph' in tokens[session_name]:
                     access_token = tokens[session_name]['graph'].get('access_token')
                     if access_token:
-                        # Pass as token dict in same format as get_drs_token_device_code returns
-                        drs_token = {'access_token': access_token}
-                        register_device(config['authentication'], parameters, drs_token)
-                    else:
-                        logging.error(f"No access_token in session '{session_name}' for register_device")
-                else:
-                    logging.error(f"No tokens available in session '{session_name}' for register_device")
+                        logging.debug(f"Using access_token from session '{session_name}'")
 
+                if access_token:
+                    drs_token = {'access_token': access_token}
+                    register_device(config['authentication'], parameters, drs_token)
+                else:
+                    logging.error("No access_token available for register_device (tried file and session)")
+                    
                 # # COMMENTED OUT: Alternative approach - do device code auth again for DRS token
                 # drs_username = config['authentication']['sessions'][session_name]['username']
                 # drs_token = get_drs_token_device_code(config['authentication']['tenant_id'], drs_username)
@@ -446,6 +464,7 @@ def main():
                 #     register_device(config['authentication'], parameters, drs_token)
                 # else:
                 #     logging.error("Failed to obtain a DRS-scoped token; skipping register_device.")
+
 
             elif technique_name == 'get_prt_with_refresh_token':
 
@@ -506,6 +525,48 @@ def main():
                     create_whfb_key(parameters)
                 else:
                     logging.error(f"No access token available for Windows Hello key registration")
+
+            elif technique_name == 'get_token_with_refresh_token':
+
+                # Load refresh_token from file if specified
+                if 'refresh_token_file' in parameters and 'refresh_token' not in parameters:
+                    try:
+                        with open(parameters['refresh_token_file'], 'r') as f:
+                            token_data = json.load(f)
+                        if 'refresh_token' in token_data:
+                            parameters['refresh_token'] = token_data['refresh_token']
+                            logging.debug(f"Loaded refresh_token from {parameters['refresh_token_file']}")
+                        else:
+                            logging.error(f"No 'refresh_token' field in {parameters['refresh_token_file']}")
+                    except FileNotFoundError:
+                        logging.error(f"refresh_token_file not found: {parameters['refresh_token_file']}")
+                    except json.JSONDecodeError as e:
+                        logging.error(f"Failed to parse {parameters['refresh_token_file']}: {e}")
+
+                # Auto-inject refresh_token from session if not provided and not from file
+                if 'refresh_token' not in parameters and session_name in tokens:
+                    if 'graph' in tokens[session_name]:
+                        parameters['refresh_token'] = tokens[session_name]['graph'].get('refresh_token')
+                        logging.debug(f"Injected refresh_token from session '{session_name}' into get_token_with_refresh_token")
+
+                if 'refresh_token' in parameters:
+                    tenant_id = parameters.get('tenant_id', config['authentication']['tenant_id'])
+                    refresh_token = parameters['refresh_token']
+                    client_id = parameters.get('client_id')
+                    scope = parameters.get('scope')
+                    resource = parameters.get('resource')
+                    token_out = parameters.get('token_out', 'token_with_refresh_token.json')
+
+                    result = get_token_with_refresh_token(tenant_id, refresh_token, scope=scope, resource=resource, client_id=client_id)
+
+                    if result and 'access_token' in result:
+                        with open(token_out, 'w') as f:
+                            json.dump(result, f, indent=2)
+                        logging.info(f"Successfully obtained token and saved to {token_out}")
+                    else:
+                        logging.error("Failed to obtain access token with refresh token")
+                else:
+                    logging.error("No refresh_token available for get_token_with_refresh_token")
 
             # Apply sleep only if this is not the last technique
             if index < len(enabled_techniques) - 1:
