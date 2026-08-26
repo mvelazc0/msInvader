@@ -84,6 +84,22 @@ def get_device_code(tenant_id, client_id, scope, claims=None):
     response = requests.post(url, data=data).json()
     return response
 
+
+def get_device_code_v1(tenant_id, client_id, scope, amr_values=None):
+    """Alternative v1.0 endpoint with amr_values support for testing MFA enforcement"""
+    url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/devicecode"
+
+    data = {
+        "client_id": client_id,
+        "scope": scope
+    }
+    if amr_values:
+        data["amr_values"] = amr_values
+
+    logging.debug(f"Using v1.0 device code endpoint with amr_values={amr_values}")
+    response = requests.post(url, data=data).json()
+    return response
+
 def get_ms_token_device_code(tenant_id, username, scope, client_id=None, require_ngcmfa=False):
 
     logging.info(f"Using device code OAuth flow to obtain a token for {username}")
@@ -144,6 +160,56 @@ def get_ms_token_device_code(tenant_id, username, scope, client_id=None, require
             access_token = token_response.get('access_token')
             return {'access_token': access_token, 'refresh_token': refresh_token}
             #return token_response.get('access_token')
+
+
+def get_ms_token_device_code_v1(tenant_id, username, scope, client_id=None, use_amr_values=False):
+    """Alternative v1.0 endpoint for testing amr_values=ngcmfa MFA enforcement"""
+    logging.info(f"Using v1.0 device code OAuth flow to obtain a token for {username}")
+
+    if client_id is None:
+        client_id = 'd3590ed6-52b3-4102-aeff-aad2292ab01c'
+
+    device_code_response = get_device_code_v1(
+        tenant_id,
+        client_id,
+        scope,
+        amr_values="ngcmfa" if use_amr_values else None
+    )
+
+    user_code = device_code_response.get("user_code")
+    device_code = device_code_response.get("device_code")
+
+    if not device_code:
+        logging.error(f"Failed to obtain a device code: {device_code_response}")
+        return
+
+    logging.info(f"Submit {user_code} at https://microsoft.com/devicelogin for v1.0 token acquisition")
+
+    token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
+    token_data = {
+        "grant_type": "device_code",
+        "code": device_code,  # v1.0 uses 'code' instead of 'device_code'
+        "client_id": client_id
+    }
+
+    while True:
+        time.sleep(5)
+        token_response = requests.post(token_url, data=token_data).json()
+
+        if "error" in token_response:
+            if token_response["error"] == "authorization_pending":
+                logging.error("Authorization pending. Please complete the user authentication.")
+            elif token_response["error"] == "slow_down":
+                time.sleep(5)
+            else:
+                logging.error(f"Error: {token_response.get('error_description')}")
+                return
+        else:
+            refresh_token = token_response.get('refresh_token')
+            access_token = token_response.get('access_token')
+            if access_token:
+                _debug_log_token_claims(access_token)
+            return {'access_token': access_token, 'refresh_token': refresh_token}
 
 
 def _debug_log_token_claims(access_token):
