@@ -169,10 +169,10 @@ def main():
         
         if session_details['type'] != 'client_credentials':
             # Use custom scope if specified in session config, otherwise default to graph_scope
-            #scope = session_details.get('scope', graph_scope)
-            #graph_token = get_ms_token(config['authentication'], session_details, scope)
-            #add_token(session_name, "graph", graph_token['access_token'], graph_token['refresh_token'], "0")
-            pass
+            scope = session_details.get('scope', graph_scope)
+            graph_token = get_ms_token(config['authentication'], session_details, scope)
+            add_token(session_name, "graph", graph_token['access_token'], graph_token['refresh_token'], "0")
+            #pass
 
             #ews_token = get_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], ews_scope)
             #add_token(session_name, "ews", ews_token['access_token'], ews_token['refresh_token'], "0")
@@ -454,9 +454,12 @@ def main():
                 if access_token:
                     drs_token = {'access_token': access_token}
                     register_device(config['authentication'], parameters, drs_token)
+                    # Extra sleep after device registration to allow propagation in Entra ID
+                    logging.info("Waiting 5 seconds for device to propagate in Entra ID...")
+                    time.sleep(5)
                 else:
                     logging.error("No access_token available for register_device (tried file and session)")
-                    
+
                 # # COMMENTED OUT: Alternative approach - do device code auth again for DRS token
                 # drs_username = config['authentication']['sessions'][session_name]['username']
                 # drs_token = get_drs_token_device_code(config['authentication']['tenant_id'], drs_username)
@@ -533,6 +536,9 @@ def main():
 
                 if 'access_token' in parameters:
                     create_whfb_key(parameters)
+                    # Extra sleep after WHFB key registration to allow propagation in Entra ID
+                    logging.info("Waiting 5 seconds for Windows Hello key to propagate in Entra ID...")
+                    time.sleep(5)
                 else:
                     logging.error(f"No access token available for Windows Hello key registration")
 
