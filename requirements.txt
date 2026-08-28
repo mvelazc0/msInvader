@@ -1,0 +1,4 @@
+requests
+PyYAML
+cryptography
+PyJWT

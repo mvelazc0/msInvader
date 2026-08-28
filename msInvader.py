@@ -9,6 +9,8 @@ from src.arm_client import *
 from src.device_client import *
 from src.auth import *
 from src.graph_client import prt_scope, graph_scope
+from src.engine import RunContext, resolve_params, validate_playbook, ReferenceError
+from src.registry import TECHNIQUES
 import logging
 import argparse
 import time
@@ -155,16 +157,36 @@ def main():
     parser = argparse.ArgumentParser(description='msInvader - M365/Azure Adversary Simulation - https://github.com/mvelazc0/msInvader')
 
     parser.add_argument('-c', dest='config', type=str, help='Configuration file')
+    parser.add_argument('--artifact-dir', dest='artifact_dir', type=str, default=None,
+                        help='Directory to dump run artifacts to, and to fall back to when '
+                             'resolving ${artifact.field} references (development/debugging)')
+    parser.add_argument('--validate-only', dest='validate_only', action='store_true',
+                        help='Load the playbook, validate every reference and required '
+                             'parameter, then exit without authenticating or calling any API')
     args = parser.parse_args()
 
     if args.config:
         config_path = args.config
     else:
-        config_path = 'config.yml'    
-    
+        config_path = 'config.yml'
+
     config = load_config(config_path)
 
-    
+    if args.validate_only:
+        errors = validate_playbook(config, TECHNIQUES)
+        for error in errors:
+            logging.error(error)
+        if errors:
+            logging.error(f"Validation failed with {len(errors)} error(s)")
+            exit(1)
+        logging.info("Validation passed")
+        exit(0)
+
+    # Per-run artifact store for technique chaining. A pass-through for playbooks
+    # that carry no ${artifact.field} references.
+    ctx = RunContext(artifact_dir=args.artifact_dir)
+
+
     for session_name, session_details in config["authentication"]["sessions"].items():
         
         if session_details['type'] != 'client_credentials':
@@ -227,7 +249,21 @@ def main():
             
             if session_name != 'nosession' and config['authentication']['sessions'][session_name]['type'] == 'client_credentials':
                 parameters['ews_impersonation'] = True
-                
+
+            # Resolve ${artifact.field} references in the step's parameters. For a
+            # step with no references this returns the parameters unchanged and an
+            # empty provenance map.
+            try:
+                resolved_params, provenance = resolve_params(parameters, ctx)
+            except ReferenceError as exc:
+                logging.error(f"Step {index + 1} ({technique_name}), {exc}")
+                exit(1)
+            parameters.update(resolved_params)
+            # A technique that produces an artifact assigns the returned dict here;
+            # a terminal technique leaves it None and the output handling below is
+            # a no-op.
+            technique_result = None
+
             if technique_name == 'search_email':
 
                 if access_method == 'graph':
@@ -583,6 +619,19 @@ def main():
                         logging.error("Failed to obtain access token with refresh token")
                 else:
                     logging.error("No refresh_token available for get_token_with_refresh_token")
+
+            # Store the step's artifact under `output:` and/or write it to
+            # `save_to_disk:`. Skipped when the technique returned nothing.
+            output_name = technique.get('output')
+            save_to_disk = technique.get('save_to_disk')
+            if technique_result is not None:
+                ctx.put(output_name or technique_name, technique_result,
+                        save_to_disk=save_to_disk)
+            elif output_name or save_to_disk:
+                logging.debug(
+                    f"Step {index + 1} ({technique_name}) declares output/save_to_disk "
+                    f"but returned no artifact"
+                )
 
             # Apply sleep only if this is not the last technique
             if index < len(enabled_techniques) - 1:

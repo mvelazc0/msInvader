@@ -156,6 +156,13 @@ cython_debug/
 *.yml
 !default-config.yml
 
+# Run artifacts and token/secret dumps - hold live access tokens,
+# refresh tokens and PRTs in the clear.
+artifacts/
+tokens_*.json
+token_*.json
+*_prt.json
+
 # PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
