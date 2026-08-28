@@ -6,9 +6,6 @@ from src.auth import get_token_with_refresh_token
 
 ### Graph
 
-graph_scope = "https://graph.microsoft.com/.default"
-prt_scope = "https://enrollment.manage.microsoft.com/.default"
-
 def read_email_graph(auth_config, params, token=False):
 
     logging.info("Running the read_email technique using the Graph API")

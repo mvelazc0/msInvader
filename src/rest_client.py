@@ -2,11 +2,6 @@ import requests
 import logging
 
 
-rest_scope   = "https://outlook.office365.com/.default"
-
-#security_compliance_scope = "https://nam11b.ps.compliance.protection.outlook.com/.default"
-
-
 def enable_email_forwarding_rest(auth_config, params, token=False):
 
     logging.info("Running the enable_email_forwarding technique using the REST API")

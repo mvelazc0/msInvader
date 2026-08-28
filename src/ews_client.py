@@ -3,7 +3,6 @@ from xml.etree import ElementTree as ET
 import logging
 
 
-ews_scope   = "https://outlook.office365.com/.default"
 ews_url = "https://outlook.office365.com/EWS/Exchange.asmx"
 
 ## Functions to create SOAP requets XMLs
