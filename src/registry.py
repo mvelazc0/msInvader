@@ -11,7 +11,22 @@ required-parameter check for that technique, and the engine applies no scope
 handling.
 """
 
-TECHNIQUES = {}
+TECHNIQUES = {
+    "password_auth": {
+        "requires": ["username", "password", "scope"],
+    },
+    "device_code_auth": {
+        "requires": ["username", "scope"],
+    },
+    "client_credentials_auth": {
+        "requires": ["client_id", "client_secret", "scope"],
+    },
+    "refresh_token_auth": {
+        # scope (v2.0) xor resource (v1.0) is enforced at run time by
+        # get_token_with_refresh_token; only refresh_token is unconditional.
+        "requires": ["refresh_token"],
+    },
+}
 
 
 def get_contract(technique_name):

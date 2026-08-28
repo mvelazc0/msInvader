@@ -11,6 +11,12 @@ from src.auth import *
 from src.graph_client import prt_scope, graph_scope
 from src.engine import RunContext, resolve_params, validate_playbook, ReferenceError
 from src.registry import TECHNIQUES
+from src.auth_techniques import (
+    password_auth,
+    device_code_auth,
+    client_credentials_auth,
+    refresh_token_auth,
+)
 import logging
 import argparse
 import time
@@ -619,6 +625,18 @@ def main():
                         logging.error("Failed to obtain access token with refresh token")
                 else:
                     logging.error("No refresh_token available for get_token_with_refresh_token")
+
+            elif technique_name == 'password_auth':
+                technique_result = password_auth(config['authentication'], parameters)
+
+            elif technique_name == 'device_code_auth':
+                technique_result = device_code_auth(config['authentication'], parameters)
+
+            elif technique_name == 'client_credentials_auth':
+                technique_result = client_credentials_auth(config['authentication'], parameters)
+
+            elif technique_name == 'refresh_token_auth':
+                technique_result = refresh_token_auth(config['authentication'], parameters)
 
             # Store the step's artifact under `output:` and/or write it to
             # `save_to_disk:`. Skipped when the technique returned nothing.
