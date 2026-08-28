@@ -193,8 +193,8 @@ def main():
     ctx = RunContext(artifact_dir=args.artifact_dir)
 
 
-    for session_name, session_details in config["authentication"]["sessions"].items():
-        
+    for session_name, session_details in config["authentication"].get("sessions", {}).items():
+
         if session_details['type'] != 'client_credentials':
             # Use custom scope if specified in session config, otherwise default to graph_scope
             scope = session_details.get('scope', graph_scope)
@@ -253,7 +253,8 @@ def main():
             parameters['ews_impersonation'] = False
 
             
-            if session_name != 'nosession' and config['authentication']['sessions'][session_name]['type'] == 'client_credentials':
+            _sessions = config['authentication'].get('sessions', {})
+            if session_name != 'nosession' and _sessions.get(session_name, {}).get('type') == 'client_credentials':
                 parameters['ews_impersonation'] = True
 
             # Resolve ${artifact.field} references in the step's parameters. For a
@@ -469,162 +470,31 @@ def main():
                 enumerate_app_role_assignments(config['authentication'], parameters, tokens[session_name]['graph'])
 
             elif technique_name == 'register_device':
-
-                access_token = None
-
-                # Load access_token from file if specified
-                if 'access_token_file' in parameters and 'access_token' not in parameters:
-                    try:
-                        with open(parameters['access_token_file'], 'r') as f:
-                            token_data = json.load(f)
-                        if 'access_token' in token_data:
-                            access_token = token_data['access_token']
-                            logging.debug(f"Loaded access_token from {parameters['access_token_file']}")
-                        else:
-                            logging.error(f"No 'access_token' field in {parameters['access_token_file']}")
-                    except FileNotFoundError:
-                        logging.error(f"access_token_file not found: {parameters['access_token_file']}")
-                    except json.JSONDecodeError as e:
-                        logging.error(f"Failed to parse {parameters['access_token_file']}: {e}")
-
-                # Fall back to session-based token if not provided via file
-                if not access_token and session_name in tokens and 'graph' in tokens[session_name]:
-                    access_token = tokens[session_name]['graph'].get('access_token')
-                    if access_token:
-                        logging.debug(f"Using access_token from session '{session_name}'")
-
-                if access_token:
-                    drs_token = {'access_token': access_token}
-                    register_device(config['authentication'], parameters, drs_token)
-                    # Extra sleep after device registration to allow propagation in Entra ID
+                technique_result = register_device(
+                    config['authentication'], parameters,
+                    {'access_token': parameters.get('access_token')},
+                )
+                if technique_result is not None:
                     logging.info("Waiting 5 seconds for device to propagate in Entra ID...")
                     time.sleep(5)
-                else:
-                    logging.error("No access_token available for register_device (tried file and session)")
-
-                # # COMMENTED OUT: Alternative approach - do device code auth again for DRS token
-                # drs_username = config['authentication']['sessions'][session_name]['username']
-                # drs_token = get_drs_token_device_code(config['authentication']['tenant_id'], drs_username)
-                # if drs_token:
-                #     register_device(config['authentication'], parameters, drs_token)
-                # else:
-                #     logging.error("Failed to obtain a DRS-scoped token; skipping register_device.")
-
 
             elif technique_name == 'get_prt_with_refresh_token':
-
-                # Load refresh_token from file if specified
-                if 'refresh_token_file' in parameters and 'refresh_token' not in parameters:
-                    try:
-                        with open(parameters['refresh_token_file'], 'r') as f:
-                            token_data = json.load(f)
-                        if 'refresh_token' in token_data:
-                            parameters['refresh_token'] = token_data['refresh_token']
-                            logging.debug(f"Loaded refresh_token from {parameters['refresh_token_file']}")
-                        else:
-                            logging.error(f"No 'refresh_token' field in {parameters['refresh_token_file']}")
-                    except FileNotFoundError:
-                        logging.error(f"refresh_token_file not found: {parameters['refresh_token_file']}")
-                    except json.JSONDecodeError as e:
-                        logging.error(f"Failed to parse {parameters['refresh_token_file']}: {e}")
-
-                # Auto-inject refresh_token from session if not provided and not from file
-                if 'refresh_token' not in parameters and session_name in tokens:
-                    if 'graph' in tokens[session_name]:
-                        parameters['refresh_token'] = tokens[session_name]['graph'].get('refresh_token')
-                        logging.debug(f"Injected refresh_token from session '{session_name}' into get_prt_with_refresh_token")
-
-                # Inject global tenant_id if not provided
-                if 'tenant_id' not in parameters:
-                    parameters['tenant_id'] = config['authentication']['tenant_id']
-
-                get_prt_with_refresh_token(parameters)
+                parameters.setdefault('tenant_id', config['authentication']['tenant_id'])
+                technique_result = get_prt_with_refresh_token(parameters)
 
             elif technique_name == 'get_token_with_prt':
-
-                if 'tenant_id' not in parameters:
-                    parameters['tenant_id'] = config['authentication']['tenant_id']
-
-                get_token_with_prt(parameters)
-
-            elif technique_name == 'get_prt_with_whfb_key':
-
-                if 'tenant_id' not in parameters:
-                    parameters['tenant_id'] = config['authentication']['tenant_id']
-
-                get_prt_with_whfb_key(parameters)
+                parameters.setdefault('tenant_id', config['authentication']['tenant_id'])
+                technique_result = get_token_with_prt(parameters)
 
             elif technique_name == 'create_whfb_key':
-
-                # Load access_token from file if specified
-                if 'access_token_file' in parameters and 'access_token' not in parameters:
-                    try:
-                        with open(parameters['access_token_file'], 'r') as f:
-                            token_data = json.load(f)
-                        if 'access_token' in token_data:
-                            parameters['access_token'] = token_data['access_token']
-                            logging.debug(f"Loaded access_token from {parameters['access_token_file']}")
-                        else:
-                            logging.error(f"No 'access_token' field in {parameters['access_token_file']}")
-                    except FileNotFoundError:
-                        logging.error(f"access_token_file not found: {parameters['access_token_file']}")
-                    except json.JSONDecodeError as e:
-                        logging.error(f"Failed to parse {parameters['access_token_file']}: {e}")
-
-                # Pass access token from session to the technique if not already provided
-                if 'access_token' not in parameters and session_name in tokens and 'graph' in tokens[session_name]:
-                    parameters['access_token'] = tokens[session_name]['graph']['access_token']
-                    logging.debug(f"Injected access_token from session '{session_name}' into create_whfb_key")
-
-                if 'access_token' in parameters:
-                    create_whfb_key(parameters)
-                    # Extra sleep after WHFB key registration to allow propagation in Entra ID
+                technique_result = create_whfb_key(parameters)
+                if technique_result is not None:
                     logging.info("Waiting 5 seconds for Windows Hello key to propagate in Entra ID...")
                     time.sleep(5)
-                else:
-                    logging.error(f"No access token available for Windows Hello key registration")
 
-            elif technique_name == 'get_token_with_refresh_token':
-
-                # Load refresh_token from file if specified
-                if 'refresh_token_file' in parameters and 'refresh_token' not in parameters:
-                    try:
-                        with open(parameters['refresh_token_file'], 'r') as f:
-                            token_data = json.load(f)
-                        if 'refresh_token' in token_data:
-                            parameters['refresh_token'] = token_data['refresh_token']
-                            logging.debug(f"Loaded refresh_token from {parameters['refresh_token_file']}")
-                        else:
-                            logging.error(f"No 'refresh_token' field in {parameters['refresh_token_file']}")
-                    except FileNotFoundError:
-                        logging.error(f"refresh_token_file not found: {parameters['refresh_token_file']}")
-                    except json.JSONDecodeError as e:
-                        logging.error(f"Failed to parse {parameters['refresh_token_file']}: {e}")
-
-                # Auto-inject refresh_token from session if not provided and not from file
-                if 'refresh_token' not in parameters and session_name in tokens:
-                    if 'graph' in tokens[session_name]:
-                        parameters['refresh_token'] = tokens[session_name]['graph'].get('refresh_token')
-                        logging.debug(f"Injected refresh_token from session '{session_name}' into get_token_with_refresh_token")
-
-                if 'refresh_token' in parameters:
-                    tenant_id = parameters.get('tenant_id', config['authentication']['tenant_id'])
-                    refresh_token = parameters['refresh_token']
-                    client_id = parameters.get('client_id')
-                    scope = parameters.get('scope')
-                    resource = parameters.get('resource')
-                    token_out = parameters.get('token_out', 'token_with_refresh_token.json')
-
-                    result = get_token_with_refresh_token(tenant_id, refresh_token, scope=scope, resource=resource, client_id=client_id)
-
-                    if result and 'access_token' in result:
-                        with open(token_out, 'w') as f:
-                            json.dump(result, f, indent=2)
-                        logging.info(f"Successfully obtained token and saved to {token_out}")
-                    else:
-                        logging.error("Failed to obtain access token with refresh token")
-                else:
-                    logging.error("No refresh_token available for get_token_with_refresh_token")
+            elif technique_name == 'get_prt_with_whfb_key':
+                parameters.setdefault('tenant_id', config['authentication']['tenant_id'])
+                technique_result = get_prt_with_whfb_key(parameters)
 
             elif technique_name == 'password_auth':
                 technique_result = password_auth(config['authentication'], parameters)

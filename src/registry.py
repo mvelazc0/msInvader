@@ -26,6 +26,24 @@ TECHNIQUES = {
         # get_token_with_refresh_token; only refresh_token is unconditional.
         "requires": ["refresh_token"],
     },
+    "register_device": {
+        "requires": ["access_token", "tenant_domain"],
+        "credential": "access_token",
+    },
+    "get_prt_with_refresh_token": {
+        "requires": ["refresh_token", "key_path", "cert_path"],
+        "credential": "refresh_token",
+    },
+    "get_token_with_prt": {
+        "requires": ["prt", "session_key", "client_id", "resource"],
+    },
+    "create_whfb_key": {
+        "requires": ["access_token"],
+        "credential": "access_token",
+    },
+    "get_prt_with_whfb_key": {
+        "requires": ["whfb_key_path", "key_path", "cert_path", "username"],
+    },
 }
 
 
