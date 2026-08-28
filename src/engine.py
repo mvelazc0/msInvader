@@ -15,6 +15,10 @@ Pieces:
   * ``validate_playbook`` - offline load-time checks: reference syntax,
                             artifact ordering, and required-parameter presence.
                             No API calls, no auth, no file writes.
+  * ``build_credential``  - turn a step's resolved credential parameter into the
+                            ``token`` dict a technique expects, minting a token
+                            for the required audience from the source artifact's
+                            refresh token when the scopes differ.
 """
 
 import difflib
@@ -23,6 +27,8 @@ import logging
 import os
 import re
 from datetime import datetime
+
+from src.auth import get_token_with_refresh_token
 
 # An artifact name, then one or more dotted field segments. The reference must
 # be the *entire* scalar - no surrounding text, no whitespace.
@@ -116,6 +122,88 @@ def resolve_params(params, ctx):
         provenance[key] = name
 
     return resolved, provenance
+
+
+# Short scope name -> the .default scope string each technique family needs.
+# Mirrors the constants scattered across the client modules today.
+SCOPES = {
+    "graph":    "https://graph.microsoft.com/.default",
+    "ews":      "https://outlook.office365.com/.default",
+    "rest":     "https://outlook.office365.com/.default",
+    "arm":      "https://management.azure.com/.default",
+    "keyvault": "https://vault.azure.net/.default",
+    "prt":      "https://enrollment.manage.microsoft.com/.default",
+}
+
+
+def _artifact_covers_scope(artifact, scope_name):
+    """True if the artifact already holds a token for *scope_name*."""
+    want = SCOPES.get(scope_name, scope_name)
+    if artifact.get("scope") == want or artifact.get("resource") == want:
+        return True
+    return scope_name in (artifact.get("_scoped_tokens") or {})
+
+
+def mint_scoped_token(artifact, scope_name):
+    """Return an access token for *scope_name*, minting it from the artifact's
+    refresh token if not already held, and caching it back into the artifact."""
+    cache = artifact.setdefault("_scoped_tokens", {})
+    if scope_name in cache:
+        return cache[scope_name]
+
+    want = SCOPES.get(scope_name, scope_name)
+    refresh_token = artifact.get("refresh_token")
+    if not refresh_token:
+        raise ReferenceError(
+            f"cannot acquire a '{scope_name}' token: the source artifact has no "
+            f"refresh_token (its token is scoped for '{artifact.get('scope')}')"
+        )
+
+    logging.info(f"minting a '{scope_name}'-scoped token from the source artifact's refresh token")
+    result = get_token_with_refresh_token(
+        artifact.get("tenant_id"), refresh_token,
+        scope=want, client_id=artifact.get("client_id"),
+    )
+    if not result or not result.get("access_token"):
+        raise ReferenceError(f"failed to mint a '{scope_name}'-scoped token from the source artifact")
+
+    cache[scope_name] = result["access_token"]
+    if result.get("refresh_token"):
+        artifact["refresh_token"] = result["refresh_token"]
+    return result["access_token"]
+
+
+def build_credential(resolved_value, source_artifact, ctx, scope_name=None):
+    """Build the ``token`` dict a technique receives, plus its ews_impersonation flag.
+
+    resolved_value  - the step's already-resolved credential parameter.
+    source_artifact - provenance: the artifact name the value came from, or None
+                      when the caller passed a literal.
+    scope_name      - the audience the technique needs (a key of SCOPES), or None
+                      when the technique calls no scoped API.
+
+    A literal has no provenance: it is used as-is, with ews_impersonation False.
+    Otherwise ews_impersonation follows the source artifact's ``flow`` (4.6), and
+    when the artifact's token is for a different audience a new one is minted from
+    its refresh token and cached back (4.5).
+    """
+    if source_artifact is None:
+        return {"access_token": resolved_value}, False
+
+    artifact = ctx.get(source_artifact)
+    if not isinstance(artifact, dict):
+        return {"access_token": resolved_value}, False
+
+    ews_impersonation = artifact.get("flow") == "client_credentials"
+
+    if not scope_name:
+        return {"access_token": resolved_value}, ews_impersonation
+
+    if _artifact_covers_scope(artifact, scope_name):
+        cached = (artifact.get("_scoped_tokens") or {}).get(scope_name)
+        return {"access_token": cached or resolved_value}, ews_impersonation
+
+    return {"access_token": mint_scoped_token(artifact, scope_name)}, ews_impersonation
 
 
 class RunContext:
