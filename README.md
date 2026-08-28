@@ -12,6 +12,8 @@ msInvader supports simulating techniques in two common attack scenarios: a compr
 
 Once authenticated, msInvader interacts with Exchange Online using three methods: the Graph API, Exchange Web Services (EWS), and the REST API used by the Exchange Online PowerShell module. This flexibility allows blue teams to simulate a wide range of attack techniques across multiple scenarios.
 
+Authentication itself is a playbook step. Each auth technique (`password_auth`, `device_code_auth`, `client_credentials_auth`, `refresh_token_auth`) produces a token that later steps consume by reference, e.g. `access_token: ${victim1.access_token}`. When a step needs a token for a different audience, one is minted from the producing step's refresh token on demand, so the sign-in events interleave with the rest of the chain instead of all firing up front.
+
 ## Documentation
 
 Visit the [Wiki](https://github.com/mvelazc0/msInvader/wiki/) for documentation.

@@ -163,6 +163,10 @@ tokens_*.json
 token_*.json
 *_prt.json
 
+# Device / Windows Hello key material written by the PRT chain
+*.key
+*.p7b
+
 # PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
