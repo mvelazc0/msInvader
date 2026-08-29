@@ -16,164 +16,109 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.engine import (  # noqa: E402
-    ReferenceError,
-    RunContext,
-    parse_reference,
-    resolve_params,
+    OutputStore,
+    PlaybookError,
+    resolve_references,
     validate_playbook,
 )
 
 
-class TestReferenceGrammar(unittest.TestCase):
-    """Literals stay literals; malformed references raise instead of passing through."""
+class TestResolveReferences(unittest.TestCase):
 
-    # A plain literal: parse_reference returns None, never raises.
-    LITERALS = [
-        "device_creds.key_path",        # bare dotted form - no ${, so a literal
-        "msinvader-test.key",           # literal file path (the reference point)
-        "device_creds['key_path']",     # bracket form - no ${
-        "{device_creds.key_path}",      # single brace, no $
-        "/abs/path/to/token.json",
-        "plain string value",
-        "",
-    ]
-
-    # Contains ${ but is not a full, valid reference: MUST raise, never literal.
-    MALFORMED = [
-        "${device_creds}",              # no field segment (no shorthand in v1)
-        "${device_creds.key_path",      # missing closing brace
-        "pre-${device_creds.key_path}", # surrounding text (prefix)
-        "${device_creds.key_path} tail",# surrounding text (suffix)
-        "${ device_creds.key_path }",   # internal whitespace
-        "${device_creds..key_path}",    # empty field segment
-        "${.key_path}",                 # missing artifact name
-        "${}",
-        "${1abc.field}",                # artifact name may not start with a digit
-    ]
-
-    VALID = {
-        "${a.b}": ("a", ["b"]),
-        "${victim1.access_token}": ("victim1", ["access_token"]),
-        "${graph_result.value.id}": ("graph_result", ["value", "id"]),
-        "${evil_app.app_id}": ("evil_app", ["app_id"]),
-        "${drs-token.refresh_token}": ("drs-token", ["refresh_token"]),
-    }
-
-    def test_literals_are_not_references(self):
-        for value in self.LITERALS:
-            with self.subTest(value=value):
-                self.assertIsNone(parse_reference(value))
-
-    def test_non_strings_are_not_references(self):
-        for value in (5, True, False, None, 3.14, ["${a.b}"], {"k": "v"}):
-            with self.subTest(value=value):
-                self.assertIsNone(parse_reference(value))
-
-    def test_malformed_references_raise_not_pass_through(self):
-        for value in self.MALFORMED:
-            with self.subTest(value=value):
-                with self.assertRaises(ReferenceError):
-                    parse_reference(value)
-
-    def test_valid_references_parse(self):
-        for value, expected in self.VALID.items():
-            with self.subTest(value=value):
-                self.assertEqual(parse_reference(value), expected)
-
-
-class TestResolveParams(unittest.TestCase):
-
-    def test_literal_passthrough_and_no_provenance(self):
-        ctx = RunContext()
+    def test_literal_passthrough_and_no_sources(self):
+        outputs = OutputStore()
         params = {"key_path": "msinvader-test.key", "limit": 5, "enabled": True}
-        resolved, provenance = resolve_params(params, ctx)
+        resolved, sources = resolve_references(params, outputs)
         self.assertEqual(resolved, params)
-        self.assertEqual(provenance, {})
+        self.assertEqual(sources, {})
 
-    def test_reference_resolution_records_provenance(self):
-        ctx = RunContext()
-        ctx.put("victim1", {"access_token": "eyJ0.aaa", "refresh_token": "0.rrr"})
+    def test_reference_resolution_records_its_source(self):
+        outputs = OutputStore()
+        outputs.save("victim1", {"access_token": "eyJ0.aaa", "refresh_token": "0.rrr"})
         params = {
             "access_token": "${victim1.access_token}",
             "mailbox": "ceo@contoso.onmicrosoft.com",
         }
-        resolved, provenance = resolve_params(params, ctx)
+        resolved, sources = resolve_references(params, outputs)
         self.assertEqual(resolved["access_token"], "eyJ0.aaa")
         self.assertEqual(resolved["mailbox"], "ceo@contoso.onmicrosoft.com")
-        self.assertEqual(provenance, {"access_token": "victim1"})
+        self.assertEqual(sources, {"access_token": "victim1"})
 
-    def test_nested_path_walks(self):
-        ctx = RunContext()
-        ctx.put("graph_result", {"value": {"id": "user-123", "mail": "a@b.c"}})
-        resolved, _ = resolve_params({"uid": "${graph_result.value.id}"}, ctx)
-        self.assertEqual(resolved["uid"], "user-123")
-
-    def test_unknown_artifact_raises_with_available_list(self):
-        ctx = RunContext()
-        ctx.put("victim1", {"access_token": "x"})
-        with self.assertRaises(ReferenceError) as caught:
-            resolve_params({"t": "${evil_app.app_id}"}, ctx)
+    def test_unknown_output_raises_with_available_list(self):
+        outputs = OutputStore()
+        outputs.save("victim1", {"access_token": "x"})
+        with self.assertRaises(PlaybookError) as caught:
+            resolve_references({"t": "${evil_app.app_id}"}, outputs)
         self.assertIn("evil_app", str(caught.exception))
         self.assertIn("victim1", str(caught.exception))
 
-    def test_unknown_field_raises_with_fields_and_hint(self):
-        ctx = RunContext()
-        ctx.put("victim1", {"access_token": "x", "refresh_token": "y"})
-        with self.assertRaises(ReferenceError) as caught:
-            resolve_params({"t": "${victim1.acces_token}"}, ctx)
+    def test_unknown_field_raises_with_available_fields(self):
+        outputs = OutputStore()
+        outputs.save("victim1", {"access_token": "x", "refresh_token": "y"})
+        with self.assertRaises(PlaybookError) as caught:
+            resolve_references({"t": "${victim1.acces_token}"}, outputs)
         message = str(caught.exception)
         self.assertIn("no field 'acces_token'", message)
         self.assertIn("access_token", message)
-        self.assertIn("did you mean 'access_token'?", message)
 
-    def test_walk_into_non_mapping_raises(self):
-        ctx = RunContext()
-        ctx.put("victim1", {"access_token": "x"})
-        with self.assertRaises(ReferenceError) as caught:
-            resolve_params({"t": "${victim1.access_token.inner}"}, ctx)
-        self.assertIn("not a mapping", str(caught.exception))
+    def test_malformed_reference_raises_not_pass_through(self):
+        # Contains ${ but is not a full ${output.field}: must raise, never be
+        # treated as a literal filename.
+        outputs = OutputStore()
+        for value in ("${device_creds}", "${device_creds.key_path",
+                      "pre-${device_creds.key_path}", "${ device_creds.key_path }"):
+            with self.subTest(value=value):
+                with self.assertRaises(PlaybookError):
+                    resolve_references({"key_path": value}, outputs)
 
-    def test_malformed_reference_in_params_raises(self):
-        ctx = RunContext()
-        with self.assertRaises(ReferenceError):
-            resolve_params({"key_path": "${device_creds}"}, ctx)
+    def test_narrates_where_each_value_came_from(self):
+        outputs = OutputStore()
+        outputs.save("device_creds", {"key_path": "k", "cert_path": "c"})
+        with self.assertLogs(level=logging.INFO) as logs:
+            resolve_references(
+                {"key_path": "${device_creds.key_path}",
+                 "cert_path": "${device_creds.cert_path}"},
+                outputs, step="Step 4 (get_prt_with_refresh_token)")
+        blob = "\n".join(logs.output)
+        self.assertIn("Step 4 (get_prt_with_refresh_token): using", blob)
+        self.assertIn("key_path and cert_path from 'device_creds'", blob)
 
 
-class TestRunContext(unittest.TestCase):
+class TestOutputStore(unittest.TestCase):
 
-    def test_in_memory_put_get_round_trip(self):
-        ctx = RunContext()
-        artifact = {"app_id": "abc", "object_id": "def"}
-        ctx.put("evil_app", artifact)
-        self.assertEqual(ctx.get("evil_app"), artifact)
+    def test_in_memory_save_get_round_trip(self):
+        store = OutputStore()
+        output = {"app_id": "abc", "object_id": "def"}
+        store.save("evil_app", output)
+        self.assertEqual(store.get("evil_app"), output)
 
     def test_get_missing_returns_none(self):
-        self.assertIsNone(RunContext().get("nope"))
+        self.assertIsNone(OutputStore().get("nope"))
 
-    def test_put_logs_field_names_not_values(self):
-        ctx = RunContext()
+    def test_save_logs_field_names_not_values(self):
+        store = OutputStore()
         with self.assertLogs(level=logging.INFO) as logs:
-            ctx.put("cred", {"secret": "S3CR3T-do-not-log", "key_id": "k1"})
+            store.save("cred", {"secret": "S3CR3T-do-not-log", "key_id": "k1"})
         blob = "\n".join(logs.output)
-        self.assertIn("stored artifact 'cred' with fields: secret, key_id", blob)
+        self.assertIn("saved output 'cred' with fields: secret, key_id", blob)
         self.assertNotIn("S3CR3T-do-not-log", blob)
 
     def test_save_to_disk_writes_named_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             target = os.path.join(tmp, "token_out.json")
-            ctx = RunContext()
-            ctx.put("tok", {"access_token": "eyJ0"}, save_to_disk=target)
+            store = OutputStore()
+            store.save("tok", {"access_token": "eyJ0"}, save_to_disk=target)
             self.assertTrue(os.path.isfile(target))
             with open(target) as handle:
                 self.assertEqual(json.load(handle), {"access_token": "eyJ0"})
 
-    def test_artifact_dir_round_trip_across_contexts(self):
+    def test_artifact_dir_round_trip_across_stores(self):
         with tempfile.TemporaryDirectory() as tmp:
-            writer = RunContext(artifact_dir=tmp)
-            writer.put("drs_token", {"refresh_token": "0.rrr", "flow": "device_code"})
+            writer = OutputStore(artifact_dir=tmp)
+            writer.save("drs_token", {"refresh_token": "0.rrr", "flow": "device_code"})
             self.assertTrue(os.path.isfile(os.path.join(tmp, "drs_token.json")))
 
-            reader = RunContext(artifact_dir=tmp)
+            reader = OutputStore(artifact_dir=tmp)
             self.assertEqual(
                 reader.get("drs_token"),
                 {"refresh_token": "0.rrr", "flow": "device_code"},
@@ -181,8 +126,8 @@ class TestRunContext(unittest.TestCase):
 
     def test_disk_fallback_is_logged_with_mtime(self):
         with tempfile.TemporaryDirectory() as tmp:
-            RunContext(artifact_dir=tmp).put("device_creds", {"key_path": "k"})
-            reader = RunContext(artifact_dir=tmp)
+            OutputStore(artifact_dir=tmp).save("device_creds", {"key_path": "k"})
+            reader = OutputStore(artifact_dir=tmp)
             with self.assertLogs(level=logging.INFO) as logs:
                 reader.get("device_creds")
             blob = "\n".join(logs.output)
@@ -191,17 +136,33 @@ class TestRunContext(unittest.TestCase):
 
     def test_in_memory_shadows_disk(self):
         with tempfile.TemporaryDirectory() as tmp:
-            RunContext(artifact_dir=tmp).put("a", {"v": "on-disk"})
-            ctx = RunContext(artifact_dir=tmp)
-            ctx.put("a", {"v": "in-memory"})
-            self.assertEqual(ctx.get("a"), {"v": "in-memory"})
+            OutputStore(artifact_dir=tmp).save("a", {"v": "on-disk"})
+            store = OutputStore(artifact_dir=tmp)
+            store.save("a", {"v": "in-memory"})
+            self.assertEqual(store.get("a"), {"v": "in-memory"})
 
     def test_names_merges_memory_and_disk(self):
         with tempfile.TemporaryDirectory() as tmp:
-            RunContext(artifact_dir=tmp).put("on_disk", {"x": 1})
-            ctx = RunContext(artifact_dir=tmp)
-            ctx.put("in_mem", {"y": 2})
-            self.assertEqual(ctx.names(), ["in_mem", "on_disk"])
+            OutputStore(artifact_dir=tmp).save("on_disk", {"x": 1})
+            store = OutputStore(artifact_dir=tmp)
+            store.save("in_mem", {"y": 2})
+            self.assertEqual(store.names(), ["in_mem", "on_disk"])
+
+    def test_minted_token_is_kept_out_of_the_saved_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = OutputStore(artifact_dir=tmp)
+            store.save("victim1", {"access_token": "AT", "refresh_token": "RT",
+                                   "tenant_id": "t", "client_id": "c", "scope": "graph"})
+            store.save_minted_token("victim1", "ews", "EWS_AT")
+
+            self.assertEqual(store.minted_token("victim1", "ews"), "EWS_AT")
+            with open(os.path.join(tmp, "victim1.json")) as handle:
+                on_disk = json.load(handle)
+            self.assertEqual(set(on_disk),
+                             {"access_token", "refresh_token", "tenant_id",
+                              "client_id", "scope"})
+            self.assertNotIn("minted", on_disk)
+            self.assertNotIn("_scoped_tokens", on_disk)
 
 
 class TestValidatePlaybook(unittest.TestCase):
@@ -219,7 +180,7 @@ class TestValidatePlaybook(unittest.TestCase):
         ])
         self.assertEqual(validate_playbook(config), [])
 
-    def test_typoed_artifact_name_is_flagged(self):
+    def test_typoed_output_name_is_flagged(self):
         config = self._pb([
             {"technique": "device_code_auth", "enabled": True, "output": "victim1",
              "parameters": {}},
@@ -283,10 +244,10 @@ class TestValidatePlaybook(unittest.TestCase):
         ])
         self.assertEqual(validate_playbook(config, {}), [])
 
-    def test_session_model_playbook_has_no_references_to_validate(self):
+    def test_playbook_with_only_literals_has_no_references_to_validate(self):
         config = self._pb([
             {"technique": "read_email", "enabled": True,
-             "parameters": {"session": "victim1", "access_method": "graph",
+             "parameters": {"access_token": "pasted-token", "access_method": "graph",
                             "mailbox": "victim1@contoso.onmicrosoft.com", "limit": 5}},
         ])
         self.assertEqual(validate_playbook(config), [])

@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import yaml  # noqa: E402
 
 from src import device_client as dc  # noqa: E402
-from src.engine import RunContext, resolve_params, validate_playbook  # noqa: E402
+from src.engine import OutputStore, resolve_references, validate_playbook  # noqa: E402
 from src.registry import TECHNIQUES  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -98,12 +98,12 @@ class TestStandaloneResumeFromArtifactDir(unittest.TestCase):
             with open(os.path.join(run_dir, "whfb_prt.json"), "w") as handle:
                 json.dump({"refresh_token": "PRT-VALUE", "session_key": "U0VTU0lPTg=="},
                           handle)
-            ctx = RunContext(artifact_dir=run_dir)
-            resolved, provenance = resolve_params(last["parameters"], ctx)
+            outputs = OutputStore(artifact_dir=run_dir)
+            resolved, sources = resolve_references(last["parameters"], outputs)
 
         self.assertEqual(resolved["prt"], "PRT-VALUE")
         self.assertEqual(resolved["session_key"], "U0VTU0lPTg==")
-        self.assertEqual(provenance, {"prt": "whfb_prt", "session_key": "whfb_prt"})
+        self.assertEqual(sources, {"prt": "whfb_prt", "session_key": "whfb_prt"})
 
 
 if __name__ == "__main__":

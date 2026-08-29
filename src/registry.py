@@ -85,8 +85,8 @@ TECHNIQUES = {
     "enumerate_arm_role_assignments":         {"requires": ["access_token"], "credential": "access_token", "scope": "arm"},
     "enumerate_arm_resources":               {"requires": ["access_token"], "credential": "access_token", "scope": "arm"},
     "enumerate_privileged_arm_role_holders":  {"requires": ["access_token"], "credential": "access_token", "scope": "arm"},
-    # bug 3.6(b): the VM techniques call management.azure.com, so they need an
-    # ARM token, not the Key Vault token they were handed before.
+    # The VM techniques call management.azure.com, so they need an ARM token,
+    # not the Key Vault token they were handed before.
     "execute_command":       {"requires": ["access_token", "subscription_id", "resource_group", "vm_name"],
                               "credential": "access_token", "scope": "arm"},
     "execute_custom_script": {"requires": ["access_token"], "credential": "access_token", "scope": "arm"},
