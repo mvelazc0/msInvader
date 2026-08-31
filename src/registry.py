@@ -37,6 +37,10 @@ TECHNIQUES = {
     "get_token_with_prt": {
         "requires": ["prt", "session_key", "client_id", "resource"],
     },
+    "get_token_with_prt_v2": {
+        # v2.0 endpoint: a 'scope' string in place of the v1.0 'resource'.
+        "requires": ["prt", "session_key", "client_id", "scope"],
+    },
     "create_whfb_key": {
         "requires": ["access_token"],
         "credential": "access_token",

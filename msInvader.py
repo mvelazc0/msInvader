@@ -24,7 +24,7 @@ import random
 
 ### Other
 
-banner = """
+banner = r"""
 
                 _____                     _           
                |_   _|                   | |          
@@ -147,6 +147,9 @@ def main():
             parameters = technique['parameters']
             access_method = parameters.get('access_method')
             parameters['ews_impersonation'] = False
+            # So techniques that write/read helper files (device .key/.p7b, WHfB
+            # key) keep them next to the run's JSON outputs.
+            parameters['_artifact_dir'] = args.artifact_dir
             step = f"Step {index + 1} ({technique_name})"
 
             # Each step goes through the same four stages:
@@ -382,6 +385,10 @@ def main():
             elif technique_name == 'get_token_with_prt':
                 parameters.setdefault('tenant_id', config['authentication']['tenant_id'])
                 technique_result = get_token_with_prt(parameters)
+
+            elif technique_name == 'get_token_with_prt_v2':
+                parameters.setdefault('tenant_id', config['authentication']['tenant_id'])
+                technique_result = get_token_with_prt_v2(parameters)
 
             elif technique_name == 'create_whfb_key':
                 technique_result = create_whfb_key(parameters)
