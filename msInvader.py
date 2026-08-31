@@ -1,5 +1,4 @@
 import yaml
-import json
 from src.ews_client import *
 from src.graph_client import *
 from src.rest_client import *
@@ -8,7 +7,16 @@ from src.vm_client import *
 from src.arm_client import *
 from src.device_client import *
 from src.auth import *
-from src.graph_client import prt_scope, graph_scope
+from src.engine import OutputStore, resolve_references, validate_playbook, PlaybookError
+from src.registry import TECHNIQUES
+from src.auth_techniques import (
+    password_auth,
+    device_code_auth,
+    client_credentials_auth,
+    refresh_token_auth,
+    token_for_step,
+    uses_impersonation,
+)
 import logging
 import argparse
 import time
@@ -16,8 +24,7 @@ import random
 
 ### Other
 
-tokens = {}
-banner = """
+banner = r"""
 
                 _____                     _           
                |_   _|                   | |          
@@ -80,73 +87,6 @@ def setup_logging(level):
     root_logger.setLevel(level)
 
 
-def add_token(session_name, scope, access_token, refresh_token, expiry):
-
-    if session_name not in tokens:
-        tokens[session_name] = {}
-    tokens[session_name][scope] = {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "expiry": expiry
-    }
-
-    # Persist tokens to disk for debugging
-    save_tokens_to_disk(session_name, scope, access_token, refresh_token)
-
-
-def save_tokens_to_disk(session_name, scope, access_token, refresh_token):
-    """Save tokens to disk for debugging/reuse without re-authentication"""
-    import json
-    from datetime import datetime
-
-    token_file = f"tokens_{session_name}_{scope.replace('/', '_').replace('.', '_').replace(':', '')}.json"
-
-    token_data = {
-        "session": session_name,
-        "scope": scope,
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "saved_at": datetime.utcnow().isoformat()
-    }
-
-    try:
-        with open(token_file, 'w') as f:
-            json.dump(token_data, f, indent=2)
-        logging.debug(f"Tokens saved to {token_file}")
-    except Exception as e:
-        logging.error(f"Failed to save tokens to disk: {e}")
-
-def get_token(session_name, scope):
-
-    session_tokens = tokens.get(session_name)
-    if not session_tokens:
-        return None  
-
-    token_info = session_tokens.get(scope)
-    if token_info:
-        #if token_info["expiry"] > time.time():
-        return token_info["access_token"]  
-        #else:
-            # Token expired; refresh it
-        #    return refresh_access_token(session_name, scope, token_info["refresh_token"])
-    return None
-
-#TODO: Need to re-implement this
-def refresh_tokens(config, session_name):
-
-        logging.info("Refresing client credential tokens after assign_app_role")
-
-        session_details= config['authentication']['sessions'][session_name]
-    
-        graph_token = get_ms_token(config['authentication'], session_details, graph_scope)
-        add_token(session_name, "graph", graph_token['access_token'], "0", "0")
-        
-        ews_token = get_ms_token(config['authentication'], session_details, ews_scope)
-        add_token(session_name, "ews", ews_token['access_token'], "0", "0")
-
-        rest_token = get_ms_token(config['authentication'], session_details, rest_scope)
-        add_token(session_name, "ews", rest_token['access_token'], "0", "0")    
-
 def main():
 
     setup_logging(logging.INFO)
@@ -155,50 +95,36 @@ def main():
     parser = argparse.ArgumentParser(description='msInvader - M365/Azure Adversary Simulation - https://github.com/mvelazc0/msInvader')
 
     parser.add_argument('-c', dest='config', type=str, help='Configuration file')
+    parser.add_argument('--artifact-dir', dest='artifact_dir', type=str, default=None,
+                        help='Directory to write each step output to, and to fall back to when '
+                             'resolving ${output.field} references (development/debugging)')
+    parser.add_argument('--validate-only', dest='validate_only', action='store_true',
+                        help='Load the playbook, validate every reference and required '
+                             'parameter, then exit without authenticating or calling any API')
     args = parser.parse_args()
 
     if args.config:
         config_path = args.config
     else:
-        config_path = 'config.yml'    
-    
+        config_path = 'config.yml'
+
     config = load_config(config_path)
 
-    
-    for session_name, session_details in config["authentication"]["sessions"].items():
-        
-        if session_details['type'] != 'client_credentials':
-            # Use custom scope if specified in session config, otherwise default to graph_scope
-            scope = session_details.get('scope', graph_scope)
-            graph_token = get_ms_token(config['authentication'], session_details, scope)
-            add_token(session_name, "graph", graph_token['access_token'], graph_token['refresh_token'], "0")
-            #pass
+    if args.validate_only:
+        errors = validate_playbook(config, TECHNIQUES)
+        for error in errors:
+            logging.error(error)
+        if errors:
+            logging.error(f"Validation failed with {len(errors)} error(s)")
+            exit(1)
+        logging.info("Validation passed")
+        exit(0)
 
-            #ews_token = get_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], ews_scope)
-            #add_token(session_name, "ews", ews_token['access_token'], ews_token['refresh_token'], "0")
+    # Per-run store of step outputs for technique chaining. A pass-through for
+    # playbooks that carry no ${output.field} references.
+    outputs = OutputStore(artifact_dir=args.artifact_dir)
 
-            #rest_token = get_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], rest_scope)
-            #add_token(session_name, "rest", rest_token['access_token'], rest_token['refresh_token'], "0")
 
-            #arm_token = get_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], arm_scope)
-            #add_token(session_name, "arm", arm_token['access_token'], arm_token['refresh_token'], "0")
-
-            ##keyvault_token = get_token_with_refresh_token(config['authentication']['tenant_id'], graph_token['refresh_token'], keyvault_scope)
-            #dd_token(session_name, "keyvault", keyvault_token['access_token'], keyvault_token['refresh_token'], "0")
-        
-        else:
-            graph_token = get_ms_token(config['authentication'], session_details, graph_scope)
-            add_token(session_name, "graph", graph_token['access_token'], "0", "0")
-            
-            ews_token = get_ms_token(config['authentication'], session_details, ews_scope)
-            add_token(session_name, "ews", ews_token['access_token'], "0", "0")
- 
-            rest_token = get_ms_token(config['authentication'], session_details, rest_scope)
-            add_token(session_name, "ews", rest_token['access_token'], "0", "0")
-                
-
-            
-        
     logging.info("************* Starting playbook execution *************")
 
     for playbook in config['playbooks']:
@@ -219,36 +145,59 @@ def main():
 
             technique_name = technique['technique']
             parameters = technique['parameters']
-            session_name = parameters.get('session', 'nosession')
-            #session_name = parameters['session']
             access_method = parameters.get('access_method')
             parameters['ews_impersonation'] = False
+            # So techniques that write/read helper files (device .key/.p7b, WHfB
+            # key) keep them next to the run's JSON outputs.
+            parameters['_artifact_dir'] = args.artifact_dir
+            step = f"Step {index + 1} ({technique_name})"
 
-            
-            if session_name != 'nosession' and config['authentication']['sessions'][session_name]['type'] == 'client_credentials':
-                parameters['ews_impersonation'] = True
-                
+            # Each step goes through the same four stages:
+            #   1. resolve any ${output.field} references into the values earlier
+            #      steps produced
+            #   2. work out which access token this technique should be handed,
+            #      redeeming a refresh token for a new audience if it needs one
+            #   3. run the technique (the if/elif dispatcher below)
+            #   4. save whatever it returned, so later steps can point at it
+            try:
+                resolved, sources = resolve_references(parameters, outputs, step=step)
+                parameters.update(resolved)
+                cred = token_for_step(technique_name, parameters, sources, outputs,
+                                      access_method, step=step)
+            except PlaybookError as exc:
+                logging.error(exc)
+                exit(1)
+
+            # An EWS technique holding an application token must send an
+            # impersonation header; one holding a user token must not.
+            parameters['ews_impersonation'] = uses_impersonation(
+                technique_name, access_method, sources, outputs)
+
+            # A technique that produces an output assigns the returned dict here;
+            # a terminal technique leaves it None and the save below is a no-op.
+            technique_result = None
+
             if technique_name == 'search_email':
 
                 if access_method == 'graph':
                     #W
-                    search_email_graph(config['authentication'], parameters, tokens[session_name]['graph'])
+                    search_email_graph(config['authentication'], parameters, cred)
 
             if technique_name == 'search_onedrive':
                 
                 if access_method == 'graph':
                     #W
-                    search_onedrive_graph(config['authentication'], parameters, tokens[session_name]['graph'])
+                    search_onedrive_graph(config['authentication'], parameters, cred)
 
             if technique_name == 'read_email':
                 
                 if access_method == 'graph':
                     #W
-                    read_email_graph2(config['authentication'], parameters, tokens[session_name]['graph'])
+                    read_email_graph2(config['authentication'], parameters, cred)
 
                 elif access_method == 'ews':
                     #W
-                    read_email_ews2(config['authentication'], parameters, tokens[session_name]['ews'])
+                    read_email_ews2(config['authentication'], parameters, cred)
                 
                 #elif access_method == 'rest':
                     # Exchange online management does not support Get-Message on M365
@@ -258,51 +207,51 @@ def main():
 
                 if access_method == 'graph':
                     #NW
-                    create_rule_graph(config['authentication'], parameters, tokens[session_name]['graph'])
+                    create_rule_graph(config['authentication'], parameters, cred)
 
                 if access_method == 'ews':
                     #W
-                    create_rule_ews2(config['authentication'], parameters, tokens[session_name]['ews'])
+                    create_rule_ews2(config['authentication'], parameters, cred)
 
                 elif access_method == 'rest':
                     #W
-                    create_rule_rest(config['authentication'], parameters, tokens[session_name]['rest'])
+                    create_rule_rest(config['authentication'], parameters, cred)
 
             elif technique_name == 'enable_email_forwarding':
 
                 if access_method == 'rest':
                     #W
-                    enable_email_forwarding_rest(config['authentication'], parameters, tokens[session_name]['rest'])      
+                    enable_email_forwarding_rest(config['authentication'], parameters, cred)      
 
             elif technique_name == 'add_folder_permission':
 
                 if access_method == 'rest':
                     #W
-                    modify_folder_permission_rest(config['authentication'], parameters, tokens[session_name]['rest'])      
+                    modify_folder_permission_rest(config['authentication'], parameters, cred)      
 
                 if access_method == 'ews':
                     #W
-                    modify_folder_permission_ews(config['authentication'], parameters, tokens[session_name]['ews'])      
+                    modify_folder_permission_ews(config['authentication'], parameters, cred)      
 
             elif technique_name == 'add_mailbox_delegation':
 
                 if access_method == 'rest':
                     #W. 
                     # Requires exchange admin
-                    add_mailbox_delegation_rest(config['authentication'], parameters, tokens[session_name]['rest'])      
+                    add_mailbox_delegation_rest(config['authentication'], parameters, cred)      
 
             elif technique_name == 'run_compliance_search':
 
                 if access_method == 'rest':
                     #NW
                     # Requires exchange admin
-                    run_compliance_search_rest(config['authentication'], parameters, tokens[session_name]['rest'])      
+                    run_compliance_search_rest(config['authentication'], parameters, cred)      
 
             elif technique_name == 'create_mailflow_rule':
 
                 if access_method == 'rest':
                     #W
-                    create_mailflow_rule_rest(config['authentication'], parameters, tokens[session_name]['rest'])      
+                    create_mailflow_rule_rest(config['authentication'], parameters, cred)      
 
             elif technique_name == 'password_spray':
                 #W
@@ -310,279 +259,168 @@ def main():
 
             elif technique_name == 'add_application_secret':
                 #W
-                add_application_secret_graph(config['authentication'], parameters, tokens[session_name]['graph'])
+                technique_result = add_application_secret_graph(config['authentication'], parameters, cred)
 
             elif technique_name == 'add_service_principal':
                 
-                add_service_principal(config['authentication'], parameters, tokens[session_name]['graph'])
+                technique_result = add_service_principal(config['authentication'], parameters, cred)
 
             elif technique_name == 'admin_consent':
                 
-                admin_consent_graph(config['authentication'], parameters, tokens[session_name]['graph'])
+                admin_consent_graph(config['authentication'], parameters, cred)
 
-            elif technique_name == 'create_app':
-                
-                app_id = create_application_registration(config['authentication'], technique['parameters'], tokens[session_name]['graph'])
-                app_id = app_id.get('appId')
-                technique['parameters']['app_id']= app_id
-                add_service_principal(config['authentication'],parameters, tokens[session_name]['graph'])
+            elif technique_name == 'create_app_registration':
+                technique_result = create_application_registration(config['authentication'], parameters, cred)
 
             elif technique_name == 'send_mail':
                 ##
-                send_email_graph(config['authentication'], parameters, tokens[session_name]['graph'])  
+                send_email_graph(config['authentication'], parameters, cred)  
                 
 
             elif technique_name == 'enumerate_users':
                 #W
-                enumerate_entities(config['authentication'], parameters, "users", tokens[session_name]['graph'])                  
+                enumerate_entities(config['authentication'], parameters, "users", cred)                  
 
             elif technique_name == 'enumerate_groups':
                 #W
-                enumerate_entities(config['authentication'], parameters, "groups", tokens[session_name]['graph'])    
+                enumerate_entities(config['authentication'], parameters, "groups", cred)    
                 
             elif technique_name == 'enumerate_applications':
                 #W
-                enumerate_entities(config['authentication'], parameters, "applications", tokens[session_name]['graph'])    
+                enumerate_entities(config['authentication'], parameters, "applications", cred)    
                 
             elif technique_name == 'enumerate_service_principals':
                 #W
-                enumerate_entities(config['authentication'], parameters, "service_principals", tokens[session_name]['graph']) 
+                enumerate_entities(config['authentication'], parameters, "service_principals", cred) 
 
             elif technique_name == 'enumerate_directory_roles':
                 #W
-                enumerate_entities(config['authentication'], parameters, "directory_roles", tokens[session_name]['graph']) 
+                enumerate_entities(config['authentication'], parameters, "directory_roles", cred) 
 
             elif technique_name == 'change_user_password':
                 #W
-                change_user_password(config['authentication'], parameters, tokens[session_name]['graph']) 
+                change_user_password(config['authentication'], parameters, cred) 
   
             elif technique_name == 'assign_app_role':
                 #W
-                assign_app_role2(config['authentication'], parameters, tokens[session_name]['graph']) 
-                time.sleep(20)
-                refresh_tokens(config, session_name )
+                assign_app_role2(config['authentication'], parameters, cred)
 
             elif technique_name == 'create_user':
                 #W
-                create_user_graph(config['authentication'], parameters, tokens[session_name]['graph']) 
+                technique_result = create_user_graph(config['authentication'], parameters, cred) 
 
             elif technique_name == 'assign_entra_role':
                 #W
-                assign_entra_role_graph(config['authentication'], parameters, tokens[session_name]['graph']) 
+                assign_entra_role_graph(config['authentication'], parameters, cred) 
 
             elif technique_name == 'list_key_vaults':
                 
-                list_key_vaults(config['authentication'], parameters, tokens[session_name]['arm']) 
+                list_key_vaults(config['authentication'], parameters, cred) 
 
             elif technique_name == 'list_keyvault_items':
                 
-                list_keyvault_items(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+                list_keyvault_items(config['authentication'], parameters, cred) 
 
             elif technique_name == 'access_key_vault_item':
                 
-                access_key_vault_item(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+                access_key_vault_item(config['authentication'], parameters, cred) 
 
             elif technique_name == 'add_keyvault_access_policy':
                 
-                add_keyvault_access_policy(config['authentication'], parameters, tokens[session_name]['arm']) 
+                add_keyvault_access_policy(config['authentication'], parameters, cred) 
 
             elif technique_name == 'list_keyvault_access_policies':
                 
-                list_keyvault_access_policies(config['authentication'], parameters, tokens[session_name]['arm']) 
+                list_keyvault_access_policies(config['authentication'], parameters, cred) 
 
             elif technique_name == 'execute_command':
                 
-                vm_execute_command(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+                vm_execute_command(config['authentication'], parameters, cred) 
 
             elif technique_name == 'execute_custom_script':
                 
-                execute_custom_script(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+                execute_custom_script(config['authentication'], parameters, cred) 
 
             elif technique_name == 'reset_password':
                 
-                vm_reset_password(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+                vm_reset_password(config['authentication'], parameters, cred) 
 
             elif technique_name == 'list_extensions':
                 
-                vm_list_extensions(config['authentication'], parameters, tokens[session_name]['keyvault'])                 
+                vm_list_extensions(config['authentication'], parameters, cred)                 
                 
             elif technique_name == 'delete_extension':
                 
-                vm_remove_extension(config['authentication'], parameters, tokens[session_name]['keyvault']) 
+                vm_remove_extension(config['authentication'], parameters, cred) 
 
             elif technique_name == 'enumerate_arm_role_assignments':
                 
-                enumerate_arm_role_assignments(config['authentication'], parameters, tokens[session_name]['arm']) 
+                enumerate_arm_role_assignments(config['authentication'], parameters, cred) 
                 
             elif technique_name == 'enumerate_arm_resources':
                 
-                enumerate_arm_resources(config['authentication'], parameters, tokens[session_name]['arm'])                 
+                enumerate_arm_resources(config['authentication'], parameters, cred)                 
 
             elif technique_name == 'enumerate_privileged_arm_role_holders':
                 
-                enumerate_privileged_arm_role_holders(config['authentication'], parameters, tokens[session_name]['arm'])      
+                enumerate_privileged_arm_role_holders(config['authentication'], parameters, cred)      
 
             elif technique_name == 'enumerate_app_role_assignments':
 
-                enumerate_app_role_assignments(config['authentication'], parameters, tokens[session_name]['graph'])
+                enumerate_app_role_assignments(config['authentication'], parameters, cred)
 
             elif technique_name == 'register_device':
-
-                access_token = None
-
-                # Load access_token from file if specified
-                if 'access_token_file' in parameters and 'access_token' not in parameters:
-                    try:
-                        with open(parameters['access_token_file'], 'r') as f:
-                            token_data = json.load(f)
-                        if 'access_token' in token_data:
-                            access_token = token_data['access_token']
-                            logging.debug(f"Loaded access_token from {parameters['access_token_file']}")
-                        else:
-                            logging.error(f"No 'access_token' field in {parameters['access_token_file']}")
-                    except FileNotFoundError:
-                        logging.error(f"access_token_file not found: {parameters['access_token_file']}")
-                    except json.JSONDecodeError as e:
-                        logging.error(f"Failed to parse {parameters['access_token_file']}: {e}")
-
-                # Fall back to session-based token if not provided via file
-                if not access_token and session_name in tokens and 'graph' in tokens[session_name]:
-                    access_token = tokens[session_name]['graph'].get('access_token')
-                    if access_token:
-                        logging.debug(f"Using access_token from session '{session_name}'")
-
-                if access_token:
-                    drs_token = {'access_token': access_token}
-                    register_device(config['authentication'], parameters, drs_token)
-                    # Extra sleep after device registration to allow propagation in Entra ID
+                technique_result = register_device(
+                    config['authentication'], parameters,
+                    {'access_token': parameters.get('access_token')},
+                )
+                if technique_result is not None:
                     logging.info("Waiting 5 seconds for device to propagate in Entra ID...")
                     time.sleep(5)
-                else:
-                    logging.error("No access_token available for register_device (tried file and session)")
-
-                # # COMMENTED OUT: Alternative approach - do device code auth again for DRS token
-                # drs_username = config['authentication']['sessions'][session_name]['username']
-                # drs_token = get_drs_token_device_code(config['authentication']['tenant_id'], drs_username)
-                # if drs_token:
-                #     register_device(config['authentication'], parameters, drs_token)
-                # else:
-                #     logging.error("Failed to obtain a DRS-scoped token; skipping register_device.")
-
 
             elif technique_name == 'get_prt_with_refresh_token':
-
-                # Load refresh_token from file if specified
-                if 'refresh_token_file' in parameters and 'refresh_token' not in parameters:
-                    try:
-                        with open(parameters['refresh_token_file'], 'r') as f:
-                            token_data = json.load(f)
-                        if 'refresh_token' in token_data:
-                            parameters['refresh_token'] = token_data['refresh_token']
-                            logging.debug(f"Loaded refresh_token from {parameters['refresh_token_file']}")
-                        else:
-                            logging.error(f"No 'refresh_token' field in {parameters['refresh_token_file']}")
-                    except FileNotFoundError:
-                        logging.error(f"refresh_token_file not found: {parameters['refresh_token_file']}")
-                    except json.JSONDecodeError as e:
-                        logging.error(f"Failed to parse {parameters['refresh_token_file']}: {e}")
-
-                # Auto-inject refresh_token from session if not provided and not from file
-                if 'refresh_token' not in parameters and session_name in tokens:
-                    if 'graph' in tokens[session_name]:
-                        parameters['refresh_token'] = tokens[session_name]['graph'].get('refresh_token')
-                        logging.debug(f"Injected refresh_token from session '{session_name}' into get_prt_with_refresh_token")
-
-                # Inject global tenant_id if not provided
-                if 'tenant_id' not in parameters:
-                    parameters['tenant_id'] = config['authentication']['tenant_id']
-
-                get_prt_with_refresh_token(parameters)
+                parameters.setdefault('tenant_id', config['authentication']['tenant_id'])
+                technique_result = get_prt_with_refresh_token(parameters)
 
             elif technique_name == 'get_token_with_prt':
+                parameters.setdefault('tenant_id', config['authentication']['tenant_id'])
+                technique_result = get_token_with_prt(parameters)
 
-                if 'tenant_id' not in parameters:
-                    parameters['tenant_id'] = config['authentication']['tenant_id']
-
-                get_token_with_prt(parameters)
-
-            elif technique_name == 'get_prt_with_whfb_key':
-
-                if 'tenant_id' not in parameters:
-                    parameters['tenant_id'] = config['authentication']['tenant_id']
-
-                get_prt_with_whfb_key(parameters)
+            elif technique_name == 'get_token_with_prt_v2':
+                parameters.setdefault('tenant_id', config['authentication']['tenant_id'])
+                technique_result = get_token_with_prt_v2(parameters)
 
             elif technique_name == 'create_whfb_key':
-
-                # Load access_token from file if specified
-                if 'access_token_file' in parameters and 'access_token' not in parameters:
-                    try:
-                        with open(parameters['access_token_file'], 'r') as f:
-                            token_data = json.load(f)
-                        if 'access_token' in token_data:
-                            parameters['access_token'] = token_data['access_token']
-                            logging.debug(f"Loaded access_token from {parameters['access_token_file']}")
-                        else:
-                            logging.error(f"No 'access_token' field in {parameters['access_token_file']}")
-                    except FileNotFoundError:
-                        logging.error(f"access_token_file not found: {parameters['access_token_file']}")
-                    except json.JSONDecodeError as e:
-                        logging.error(f"Failed to parse {parameters['access_token_file']}: {e}")
-
-                # Pass access token from session to the technique if not already provided
-                if 'access_token' not in parameters and session_name in tokens and 'graph' in tokens[session_name]:
-                    parameters['access_token'] = tokens[session_name]['graph']['access_token']
-                    logging.debug(f"Injected access_token from session '{session_name}' into create_whfb_key")
-
-                if 'access_token' in parameters:
-                    create_whfb_key(parameters)
-                    # Extra sleep after WHFB key registration to allow propagation in Entra ID
+                technique_result = create_whfb_key(parameters)
+                if technique_result is not None:
                     logging.info("Waiting 5 seconds for Windows Hello key to propagate in Entra ID...")
                     time.sleep(5)
-                else:
-                    logging.error(f"No access token available for Windows Hello key registration")
 
-            elif technique_name == 'get_token_with_refresh_token':
+            elif technique_name == 'get_prt_with_whfb_key':
+                parameters.setdefault('tenant_id', config['authentication']['tenant_id'])
+                technique_result = get_prt_with_whfb_key(parameters)
 
-                # Load refresh_token from file if specified
-                if 'refresh_token_file' in parameters and 'refresh_token' not in parameters:
-                    try:
-                        with open(parameters['refresh_token_file'], 'r') as f:
-                            token_data = json.load(f)
-                        if 'refresh_token' in token_data:
-                            parameters['refresh_token'] = token_data['refresh_token']
-                            logging.debug(f"Loaded refresh_token from {parameters['refresh_token_file']}")
-                        else:
-                            logging.error(f"No 'refresh_token' field in {parameters['refresh_token_file']}")
-                    except FileNotFoundError:
-                        logging.error(f"refresh_token_file not found: {parameters['refresh_token_file']}")
-                    except json.JSONDecodeError as e:
-                        logging.error(f"Failed to parse {parameters['refresh_token_file']}: {e}")
+            elif technique_name == 'password_auth':
+                technique_result = password_auth(config['authentication'], parameters)
 
-                # Auto-inject refresh_token from session if not provided and not from file
-                if 'refresh_token' not in parameters and session_name in tokens:
-                    if 'graph' in tokens[session_name]:
-                        parameters['refresh_token'] = tokens[session_name]['graph'].get('refresh_token')
-                        logging.debug(f"Injected refresh_token from session '{session_name}' into get_token_with_refresh_token")
+            elif technique_name == 'device_code_auth':
+                technique_result = device_code_auth(config['authentication'], parameters)
 
-                if 'refresh_token' in parameters:
-                    tenant_id = parameters.get('tenant_id', config['authentication']['tenant_id'])
-                    refresh_token = parameters['refresh_token']
-                    client_id = parameters.get('client_id')
-                    scope = parameters.get('scope')
-                    resource = parameters.get('resource')
-                    token_out = parameters.get('token_out', 'token_with_refresh_token.json')
+            elif technique_name == 'client_credentials_auth':
+                technique_result = client_credentials_auth(config['authentication'], parameters)
 
-                    result = get_token_with_refresh_token(tenant_id, refresh_token, scope=scope, resource=resource, client_id=client_id)
+            elif technique_name == 'refresh_token_auth':
+                technique_result = refresh_token_auth(config['authentication'], parameters)
 
-                    if result and 'access_token' in result:
-                        with open(token_out, 'w') as f:
-                            json.dump(result, f, indent=2)
-                        logging.info(f"Successfully obtained token and saved to {token_out}")
-                    else:
-                        logging.error("Failed to obtain access token with refresh token")
-                else:
-                    logging.error("No refresh_token available for get_token_with_refresh_token")
+            # Keep the step's output under `output:` and/or write it to
+            # `save_to_disk:`. Skipped when the technique returned nothing.
+            output_name = technique.get('output')
+            save_to_disk = technique.get('save_to_disk')
+            if technique_result is not None:
+                outputs.save(output_name or technique_name, technique_result,
+                             save_to_disk=save_to_disk, step=step)
+            elif output_name or save_to_disk:
+                logging.debug(f"{step} declares output/save_to_disk but returned nothing")
 
             # Apply sleep only if this is not the last technique
             if index < len(enabled_techniques) - 1:

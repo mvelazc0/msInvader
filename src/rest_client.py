@@ -1,11 +1,5 @@
 import requests
-from src.auth import get_ms_token
 import logging
-
-
-rest_scope   = "https://outlook.office365.com/.default"
-
-#security_compliance_scope = "https://nam11b.ps.compliance.protection.outlook.com/.default"
 
 
 def enable_email_forwarding_rest(auth_config, params, token=False):
@@ -16,9 +10,6 @@ def enable_email_forwarding_rest(auth_config, params, token=False):
 
     tenant_id = tenant_id
     rest_endpoint = f'https://outlook.office365.com/adminapi/beta/{tenant_id}/InvokeCommand'
-
-    if not token:
-        token =  get_ms_token(auth_config, params['auth_method'], rest_scope)
 
     access_token = token['access_token']
     headers = {
@@ -58,9 +49,6 @@ def create_rule_rest(auth_config, params, token=False):
     tenant_id = auth_config['tenant_id']
 
     rest_endpoint = f'https://outlook.office365.com/adminapi/beta/{tenant_id}/InvokeCommand'
-
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], rest_scope)
 
     access_token = token['access_token']
     headers = {
@@ -109,9 +97,6 @@ def modify_folder_permission_rest(auth_config, params, token=False):
     else:
         command = "Add-MailboxFolderPermission"
 
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], rest_scope)
-
     access_token = token['access_token']
     headers = {
         'Authorization': f'Bearer {access_token}',
@@ -153,9 +138,6 @@ def add_mailbox_delegation_rest(auth_config, params, token=False):
     tenant_id = auth_config['tenant_id']
 
     rest_endpoint = f'https://outlook.office365.com/adminapi/beta/{tenant_id}/InvokeCommand'
-
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], rest_scope)
 
     access_token = token['access_token']
     headers = {
@@ -200,10 +182,6 @@ def run_compliance_search_rest(auth_config, params, token=False):
 
     #rest_endpoint = f'https://outlook.office365.com/adminapi/beta/{tenant_id}/InvokeCommand'
     rest_endpoint = f'https://nam11b.ps.compliance.protection.outlook.com/adminapi/beta/{tenant_id}/InvokeCommand'
-
-    #token = get_ms_token(auth_config, params['auth_method'], security_compliance_scope)
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], rest_scope)
 
     access_token = token['access_token']
     headers = {
@@ -264,9 +242,6 @@ def create_mailflow_rule_rest(auth_config, params, token=False):
     tenant_id = auth_config['tenant_id']
 
     rest_endpoint = f'https://outlook.office365.com/adminapi/beta/{tenant_id}/InvokeCommand'
-
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], rest_scope)
 
 
     access_token = token['access_token']

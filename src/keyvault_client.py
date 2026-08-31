@@ -4,10 +4,6 @@ import logging
 import random
 
 
-arm_scope = "https://management.azure.com/.default"
-keyvault_scope = "https://vault.azure.net/.default"
-
-
 def list_key_vaults(auth_config, params, token=False):
 
     logging.info("Running the list_key_vaults technique")

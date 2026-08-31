@@ -1,10 +1,8 @@
 import requests
 from xml.etree import ElementTree as ET
-from src.auth import get_ms_token
 import logging
 
 
-ews_scope   = "https://outlook.office365.com/.default"
 ews_url = "https://outlook.office365.com/EWS/Exchange.asmx"
 
 ## Functions to create SOAP requets XMLs
@@ -317,9 +315,6 @@ def read_email_ews(auth_config, params, token=False):
 
     logging.info("Running the read_email technique using the EWS API")
 
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], ews_scope)
-
     mailbox= params['mailbox']
 
     # Headers
@@ -381,9 +376,6 @@ def read_email_ews(auth_config, params, token=False):
 def read_email_ews2(auth_config, params, token=False):
     
     logging.info("Running the read_email technique using the EWS API")
-
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], ews_scope)
 
     mailboxes = params['mailbox']
     if not isinstance(mailboxes, list):  
@@ -457,9 +449,6 @@ def create_rule_ews(auth_config, params, token=False):
     else:
         soap_request = create_forwarding_rule_soap_request(mailbox, forward_to, rule_name, body_contains)
 
-    if not token:
-        token =  get_ms_token(auth_config, params['auth_method'], ews_scope)
-
     # Send the EWS request with OAuth token
     logging.info("Calling the UpdateInboxRules operation on the EWS API")
 
@@ -503,9 +492,6 @@ def create_rule_ews2(auth_config, params, token=False):
         else:
             soap_request = create_forwarding_rule_soap_request(mailbox, forward_to, rule_name, body_contains)
 
-        if not token:
-            token =  get_ms_token(auth_config, params['auth_method'], ews_scope)
-
         # Send the EWS request with OAuth token
         logging.info("Calling the UpdateInboxRules operation on the EWS API")
 
@@ -538,9 +524,6 @@ def create_rule_ews2(auth_config, params, token=False):
             soap_request = create_moving_rule_soap_request(mailbox, destination_folder, rule_name, body_contains, True)
         else:
             soap_request = create_moving_rule_soap_request(mailbox, destination_folder, rule_name, body_contains)
-
-        if not token:
-            token =  get_ms_token(auth_config, params['auth_method'], ews_scope)
 
         # Send the EWS request with OAuth token
         logging.info("Calling the UpdateInboxRules operation on the EWS API")
@@ -605,9 +588,6 @@ def modify_folder_permission_ews(auth_config, params, token=False):
 
     else:
         find_item_body = create_find_folder_soap_request(params['mailbox'], params['folder'])
-
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], ews_scope)
 
     access_token = token['access_token']
 

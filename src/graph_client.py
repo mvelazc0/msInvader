@@ -2,19 +2,13 @@ import requests
 import logging
 import datetime
 import os
-from src.auth import get_ms_token, get_token_with_refresh_token
+from src.auth import get_token_with_refresh_token
 
 ### Graph
-
-graph_scope = "https://graph.microsoft.com/.default"
-prt_scope = "https://enrollment.manage.microsoft.com/.default"
 
 def read_email_graph(auth_config, params, token=False):
 
     logging.info("Running the read_email technique using the Graph API")
-
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
 
     mailbox = params['mailbox']
     graph_endpoint = f'https://graph.microsoft.com/v1.0/users/{mailbox}/mailFolders/Inbox/messages'
@@ -47,9 +41,6 @@ def read_email_graph(auth_config, params, token=False):
 def read_email_graph2(auth_config, params, token=False):
 
     logging.info("Running the read_email technique using the Graph API")
-
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
 
 
     access_token = token['access_token']
@@ -91,9 +82,6 @@ def read_email_graph2(auth_config, params, token=False):
 def search_email_graph(auth_config, params, token=False):
 
     logging.info("Running the search_email technique using the Graph API")
-
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
 
     graph_endpoint = f'https://graph.microsoft.com/v1.0/search/query'
 
@@ -150,9 +138,6 @@ def search_email_graph(auth_config, params, token=False):
 def search_onedrive_graph(auth_config, params, token=False):
 
     logging.info("Running the search_onedrive technique using the Graph API")
-
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
 
     graph_endpoint = f'https://graph.microsoft.com/v1.0/search/query'
     access_token = token['access_token']
@@ -240,9 +225,6 @@ def create_rule_graph(auth_config, params, token=False):
     
     #print(access_token)
 
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
-
     headers = {
         'Authorization': f'Bearer {access_token}',
         'Content-Type': 'application/json'
@@ -284,9 +266,6 @@ def add_application_secret_graph(auth_config, params, token=False):
 
     logging.info("Running the add_secret technique using the Graph API")
 
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
-
     app_object_id = params['app_id']
     #secret_description = params['description']
     secret_description = params.get('description', 'Simulation Secret')
@@ -313,9 +292,14 @@ def add_application_secret_graph(auth_config, params, token=False):
     response = requests.post(graph_endpoint, headers=headers, json=data)
 
     if response.status_code == 200:
+        data = response.json()
         logging.info("200 OK - Secret added successfully")
-        secret_id = response.json().get('keyId')
-        logging.info(f"Added secret with ID: {secret_id}")
+        logging.info(f"Added secret with ID: {data.get('keyId')}")
+        return {
+            "secret": data.get("secretText"),
+            "key_id": data.get("keyId"),
+            "end_date": data.get("endDateTime"),
+        }
     else:
         logging.error(f"Operation failed with status code {response.status_code}")
         print(response.text)
@@ -324,9 +308,6 @@ def add_application_secret_graph(auth_config, params, token=False):
 def add_service_principal(auth_config, params, token=False):
 
     logging.info("Running the add_service_principal technique using the Graph API")
-
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
 
     app_id = params['app_id']  # The App ID (client ID) of the external multi-tenant app
     graph_endpoint = 'https://graph.microsoft.com/v1.0/servicePrincipals'
@@ -346,10 +327,10 @@ def add_service_principal(auth_config, params, token=False):
     response = requests.post(graph_endpoint, headers=headers, json=data)
 
     if response.status_code == 201:
-        logging.info("201 Created - Service principal for external app added successfully")
-        #print (response.json())
         service_principal_id = response.json().get('id')
+        logging.info("201 Created - Service principal for external app added successfully")
         logging.info(f"Service principal ID: {service_principal_id}")
+        return {"service_principal_id": service_principal_id, "app_id": app_id}
     else:
         logging.error(f"Operation failed with status code {response.status_code}")
         print(response.text)
@@ -358,9 +339,6 @@ def add_service_principal(auth_config, params, token=False):
 def admin_consent_graph(auth_config, params, token=False):
 
     logging.info("Running the admin_consent technique using the Graph API")
-
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
 
     client_id = params['client_id']  # The ID of the external multi-tenant app
     tenant_id = auth_config['tenant_id']  # Your tenant ID
@@ -398,9 +376,6 @@ def admin_consent_graph(auth_config, params, token=False):
 def create_application_registration(auth_config, params, token=False):
     logging.info("Running the create_application_registration technique using the Graph API")
 
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
-
     app_name = params['app_name']  
     redirect_uris = params.get('redirect_uris', []) 
     sign_in_audience = params.get('sign_in_audience', 'AzureADMyOrg')
@@ -426,21 +401,22 @@ def create_application_registration(auth_config, params, token=False):
     response = requests.post(graph_endpoint, headers=headers, json=data)
 
     if response.status_code == 201:
+        data = response.json()
         logging.info("201 Created - Application registration created successfully")
-        app_id = response.json().get('appId')
-        logging.info(f"New application App ID: {app_id}")
-        return response.json()
+        logging.info(f"New application App ID: {data.get('appId')}")
+        return {
+            "app_id": data.get("appId"),
+            "object_id": data.get("id"),
+            "display_name": data.get("displayName"),
+        }
     else:
         logging.error(f"Operation failed with status code {response.status_code}")
-        print(response.text)        
+        print(response.text)
 
 
 def download_onedrive_file(auth_config, params, save_path, token=False):
     
     logging.info("Running the download_onedrive_file technique using the Graph API")
-
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
 
     download_dir = os.path.dirname(save_path)
     if not os.path.exists(download_dir):
@@ -483,9 +459,6 @@ def download_onedrive_file(auth_config, params, save_path, token=False):
         
 def get_authenticated_user_id(auth_config, token=False):
     
-    if not token:
-        token = get_ms_token(auth_config, 'authorization_code', 'https://graph.microsoft.com/.default')
-
     graph_endpoint = 'https://graph.microsoft.com/v1.0/me'
 
     access_token = token['access_token']
@@ -509,9 +482,6 @@ def send_email_graph(auth_config, params, token=False):
 
     logging.info("Running the send_email technique using the Graph API")
 
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
-        
     
     access_token = token['access_token']
     refresh_token = token['refresh_token']    
@@ -588,9 +558,6 @@ def enumerate_entities(auth_config, params, entity_type=None, token=False):
         logging.error("Invalid entity_type format. Must be a string, list, or None.")
         return
 
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
-
     access_token = token['access_token']
     headers = {
         'Authorization': f'Bearer {access_token}',
@@ -622,9 +589,6 @@ def change_user_password(auth_config, params, token=False):
     logging.info(f"Running the change_user_password technique")
     user_id = params['user_id']
     new_password = params['new_password']
-
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
 
     access_token = token['access_token']
     headers = {
@@ -725,9 +689,6 @@ def create_user_graph(auth_config, params, token=False):
 
     logging.info("Running the create_user technique using the Graph API")
 
-    if not token :
-        token = get_ms_token(auth_config, params['auth_method'], 'https://graph.microsoft.com/.default')
-
     # API Endpoint
     graph_endpoint = "https://graph.microsoft.com/v1.0/users"
 
@@ -758,8 +719,13 @@ def create_user_graph(auth_config, params, token=False):
     response = requests.post(graph_endpoint, headers=headers, json=user_payload)
 
     if response.status_code == 201:
+        data = response.json()
         logging.info("201 Created - User created successfully.")
-
+        return {
+            "user_id": data.get("id"),
+            "user_principal_name": data.get("userPrincipalName"),
+            "display_name": data.get("displayName"),
+        }
     else:
         logging.error(f"Failed to create user with status code: {response.status_code}")
         print(response.json())
@@ -776,9 +742,6 @@ def assign_entra_role_graph(auth_config, params, token=False):
     if principal_id == 0:
         principal_id =  get_user_object_guid(auth_config, params, upn, token)
     
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], 'https://graph.microsoft.com/.default')
-
 
     access_token = token['access_token']
     headers = {
@@ -815,9 +778,6 @@ def get_user_object_guid(auth_config, params, upn, token=False):
     logging.info(f"Retrieving Object GUID for UPN: {upn}")
 
     # Obtain token if not provided
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
-
     access_token = token['access_token']
     headers = {
         'Authorization': f'Bearer {access_token}',
@@ -856,9 +816,6 @@ def enumerate_app_role_assignments(auth_config, params, token=False):
     import json
 
     logging.info("Running the enumerate_app_role_assignments technique using the Graph API")
-
-    if not token:
-        token = get_ms_token(auth_config, params['auth_method'], graph_scope)
 
 
     access_token = token['access_token']

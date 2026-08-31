@@ -312,35 +312,6 @@ def get_token_with_refresh_token(tenant_id, refresh_token, scope=None, resource=
         logging.error(f'Error obtaining new access token. HTTP response: {response.status_code}')
         print(response.json())
 
-"""
-def get_ms_token(auth_config, auth_method, scope):
-    
-    if auth_method == 'resource_owner':
-        return get_ms_token_username_pass(auth_config['tenant_id'], auth_config['username'], auth_config['password'], scope)
-    elif auth_method == 'device_code':
-        return get_ms_token_device_code(auth_config['tenant_id'], scope)
-    elif auth_method == 'client_credentials':
-        return get_ms_token_client(auth_config['tenant_id'], auth_config['application_id'], auth_config['client_secret'], scope)
-"""    
-
-def get_ms_token(auth_config, session_details, scope):
-
-    auth_method = session_details.get('type', '')
-    username = session_details.get('username', '')
-    password  = session_details.get('password', '')
-    app_id = session_details.get('app_id', '')
-    secret = session_details.get('secret', '')
-    client_id = session_details.get('client_id', None)  # Optional: specify client_id for device_code flow
-    require_ngcmfa = session_details.get('require_ngcmfa', False)
-
-    if auth_method == 'resource_owner':
-        return get_ms_token_username_pass(auth_config['tenant_id'], username, password, scope)
-    elif auth_method == 'device_code':
-        return get_ms_token_device_code(
-            auth_config['tenant_id'], username, scope, client_id, require_ngcmfa
-        )
-    elif auth_method == 'client_credentials':
-        return get_ms_token_client(auth_config['tenant_id'], app_id, secret, scope)    
 
 def password_spray(params, sleep=None, jitter=None, user_agent=None, proxy=None):
     
