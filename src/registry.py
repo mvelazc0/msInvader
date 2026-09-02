@@ -34,6 +34,11 @@ TECHNIQUES = {
         "requires": ["refresh_token", "key_path", "cert_path"],
         "credential": "refresh_token",
     },
+    "get_prt_with_refresh_token_v2": {
+        # v2.0 endpoint: prt_protocol_version 3.0 in place of windows_api_version.
+        "requires": ["refresh_token", "key_path", "cert_path"],
+        "credential": "refresh_token",
+    },
     "get_token_with_prt": {
         "requires": ["prt", "session_key", "client_id", "resource"],
     },
@@ -46,6 +51,10 @@ TECHNIQUES = {
         "credential": "access_token",
     },
     "get_prt_with_whfb_key": {
+        "requires": ["whfb_key_path", "key_path", "cert_path", "username"],
+    },
+    "get_prt_with_whfb_key_v2": {
+        # v2.0 endpoint: prt_protocol_version 3.0 in place of windows_api_version.
         "requires": ["whfb_key_path", "key_path", "cert_path", "username"],
     },
 

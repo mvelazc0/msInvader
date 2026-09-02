@@ -382,6 +382,10 @@ def main():
                 parameters.setdefault('tenant_id', config['authentication']['tenant_id'])
                 technique_result = get_prt_with_refresh_token(parameters)
 
+            elif technique_name == 'get_prt_with_refresh_token_v2':
+                parameters.setdefault('tenant_id', config['authentication']['tenant_id'])
+                technique_result = get_prt_with_refresh_token_v2(parameters)
+
             elif technique_name == 'get_token_with_prt':
                 parameters.setdefault('tenant_id', config['authentication']['tenant_id'])
                 technique_result = get_token_with_prt(parameters)
@@ -399,6 +403,10 @@ def main():
             elif technique_name == 'get_prt_with_whfb_key':
                 parameters.setdefault('tenant_id', config['authentication']['tenant_id'])
                 technique_result = get_prt_with_whfb_key(parameters)
+
+            elif technique_name == 'get_prt_with_whfb_key_v2':
+                parameters.setdefault('tenant_id', config['authentication']['tenant_id'])
+                technique_result = get_prt_with_whfb_key_v2(parameters)
 
             elif technique_name == 'password_auth':
                 technique_result = password_auth(config['authentication'], parameters)
